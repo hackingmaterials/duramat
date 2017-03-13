@@ -192,30 +192,16 @@ def predict_linear_fit(xvalues, fit):
     return y_pred
 
 
-def read_csv_to_ts(site_ids_list, property_of_interest, time_block):
+def read_csv_to_ts(site_dict, property_of_interest):
     '''
-    read csvs for all sites in site_ids_list, get property_of_interest, and return a pandas
+    read csvs for all sites in site_dict, get property_of_interest, and return a pandas
     dataframe where each column is the property of interest for a given site and indices
     are timestamps for the data
 
-    right now it is assumed that the filenames are saved in the directory ./data_sets/
-    and the names are of the following form:
-
-    {site_id}-{time_block}.csv
-        ^          ^
-        |          |_ aggregation time from API call (hourly, daily, weekly, monthly)
-        |
-        |__ integer system_id
-
-    NOTE: in this directory there is a scraping script that will get data from PVDAQ and save it
-    in the above format.  it does not automatically create data_sets/.  Right now it is up to you
-    to create the directory and move the files.
-
-    TO DO: change arguments to allow for great flexibility (path to file, supply filenames of any format, etc)
-
     arguments:
-        site_ids_list (array like)
-            list of integers for system ids in pvdaq database
+        site_dict (dict)
+            dict where keys should be system specific and value is the filename (with path)
+            the file is assumed to be a .csv now
         property_of_interest (str)
             column header for property desired
         time_block (str)
@@ -224,9 +210,9 @@ def read_csv_to_ts(site_ids_list, property_of_interest, time_block):
         pandas dataframe indexed as time-series
     '''
     sites_list = []
-    for site in site_ids_list:
+    for site in site_dict:
         try:
-            df = pd.read_csv('data_sets/' + str(site) + '-' + time_block + '.csv')
+            df = pd.read_csv(site_dict[site])
         except FileNotFoundError:
             continue
 
