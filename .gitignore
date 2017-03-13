@@ -1,3 +1,7 @@
+.ipynb_checkpoints
+.DS_Store
+input/
+
 *.py[cod]
 
 # doc builds
