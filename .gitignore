@@ -1,6 +1,8 @@
-.ipynb_checkpoints
+# Misc OS X files
 .DS_Store
-input/
+
+# Secured files
+data/
 
 *.py[cod]
 
