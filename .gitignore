@@ -1,3 +1,9 @@
+# Misc OS X files
+.DS_Store
+
+# Secured files
+data/
+
 *.py[cod]
 
 # doc builds
