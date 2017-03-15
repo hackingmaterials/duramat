@@ -2,10 +2,13 @@
 
 import pvdaq_api
 import sys
-import pandas as pd
+# import pandas as pd
 import datetime
 import collections
 import argparse
+
+# formats for output
+FORMAT = ('csv', 'json')
 
 # allowed time periods for when data is aggregated
 PERIODS = ('hourly', 'daily', 'weekly', 'monthly')
@@ -25,23 +28,30 @@ def main(argv):
     required_named = parser.add_argument_group('required named arguments')
     required_named.add_argument('-k', '--key', default=None, required=True, help='PVDAQ API key needed to access site data.')
     required_named.add_argument('-p', '--period', default=None, required=True,
-                                help='Time period of the aggregation for which to get data. Options are {}'.format(' '.join(PERIODS)))
-    parser.add_argument('-sid', '--system_id', default=None, required=False, nargs='+',
-                        help='Specific system_id(s) separated by spaces. Options are {}'.format(' '.join([str(x) for x in SITES])))
+                                help='Time period of the aggregation for which to get data. Options are {}.'.format(','.join(PERIODS)))
+    parser.add_argument('-f', '--format', default='csv', required=False,
+                        help='Format of saved file.  Options are {}.'.format(','.join(FORMAT)))
+    parser.add_argument('-sid', '--system_id', default=None, required=False, nargs='*',
+                        help='Specific system_id(s) separated by spaces. Options are {}.'.format(','.join([str(x) for x in SITES])))
 
     args = parser.parse_args(argv)
     key = args.key
     period = args.period
+    fileformat = args.format
     if period not in PERIODS:
         raise ValueError('period must be one of the following: {}'.format(','.join(PERIODS)))
-    if args.system_id is not None:
-        sites = [int(x) for x in args.system_id]
-    else:
+    if fileformat not in FORMAT:
+        raise ValueError('format must be one of the following: {}'.format(','.join(FORMAT)))
+    if args.system_id is None:
         sites = SITES
-    scrape_aggregate_data(key, period, sites)
+    else:
+        sites = [int(x) for x in args.system_id]
+        if not all(i in SITES for i in sites):
+            raise ValueError('sites must be one of the following: {}'.format(','.join([str(x) for x in SITES])))
+    scrape_aggregate_data(key, period, sites, fileformat)
 
 
-def scrape_aggregate_data(key, period, sites):
+def scrape_aggregate_data(key, period, sites, fileformat):
     '''
     gather aggregated site data from PVDAQ for a given period of aggregation
     will print any sites to a CSV in the current directory.
@@ -67,7 +77,7 @@ def scrape_aggregate_data(key, period, sites):
 
     while sites:
         site = sites.pop(0)
-        print('{}\r'.format(site))
+        print('{}'.format(site))
         try:
             info = api.sites({'system_id': site})
         except:
@@ -89,19 +99,24 @@ def scrape_aggregate_data(key, period, sites):
                                       'start_date': min_date,
                                       'end_date': max_date,
                                       'aggregate': period})
-            df = pd.DataFrame.from_dict(agg_data)
-            df.to_csv('./{}-{}.csv'.format(site, period), index=False)
+            # df = pd.DataFrame.from_dict(agg_data)
+            if fileformat == 'csv':
+                agg_data.to_csv('./{}-{}.csv'.format(site, period), index=False)
+            elif fileformat == 'json':
+                agg_data.to_json('./{}-{}.json'.format(site, period), orient='index')
+            else:
+                raise ValueError('fileformat unrecognized.')
             if site in failed_counts:
                 del failed_counts[site]
         except:
-            failed_counts[site] += 1
-            if all(i >= 2 for i in failed_counts.values()):
-                print('error processing sites {}'.format(failed_counts.keys()))
-                # sys.exit(-1)
-                return failed_counts.keys()
-            sites.append(site)
-            continue
-        return faild_counts.keys()
+            print('error with site {}'.format(site))
+            # failed_counts[site] += 1
+            # if all(i >= 2 for i in failed_counts.values()):
+            #     print('error processing sites: {}'.format(','.join([str(i) for i in failed_counts.keys()])))
+            #     return failed_counts.keys()
+            # sites.append(site)
+            # continue
+    # return failed_counts.keys()
 
 if __name__ == '__main__':
     main(sys.argv[1:])
