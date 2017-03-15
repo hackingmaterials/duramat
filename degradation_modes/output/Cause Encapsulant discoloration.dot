@@ -1,0 +1,36 @@
+digraph Tree {
+node [shape=box, style="filled", color="black"] ;
+0 [label="Mounting 1-axis tracker <= 0.5\ngini = 0.4464\nsamples = 11046\nvalue = [7331, 3715]\nclass = None", fillcolor="#e581397e"] ;
+1 [label="Mounting roof rack <= 0.5\ngini = 0.2382\nsamples = 7785\nvalue = [6709, 1076]\nclass = None", fillcolor="#e58139d6"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="Climate3 Hot & Humid <= 0.5\ngini = 0.1507\nsamples = 6920\nvalue = [6352, 568]\nclass = None", fillcolor="#e58139e8"] ;
+1 -> 2 ;
+3 [label="Climate3 Desert <= 0.5\ngini = 0.0869\nsamples = 5972\nvalue = [5700, 272]\nclass = None", fillcolor="#e58139f3"] ;
+2 -> 3 ;
+4 [label="Climate3 Moderate <= 0.5\ngini = 0.0843\nsamples = 5827\nvalue = [5570, 257]\nclass = None", fillcolor="#e58139f3"] ;
+3 -> 4 ;
+5 [label="gini = 0.0361\nsamples = 326\nvalue = [320, 6]\nclass = None", fillcolor="#e58139fa"] ;
+4 -> 5 ;
+6 [label="Mounting roof <= 0.5\ngini = 0.0871\nsamples = 5501\nvalue = [5250, 251]\nclass = None", fillcolor="#e58139f3"] ;
+4 -> 6 ;
+7 [label="Mounting other <= 0.5\ngini = 0.0853\nsamples = 5354\nvalue = [5115, 239]\nclass = None", fillcolor="#e58139f3"] ;
+6 -> 7 ;
+8 [label="gini = 0.0858\nsamples = 4540\nvalue = [4336, 204]\nclass = None", fillcolor="#e58139f3"] ;
+7 -> 8 ;
+9 [label="gini = 0.0823\nsamples = 814\nvalue = [779, 35]\nclass = None", fillcolor="#e58139f4"] ;
+7 -> 9 ;
+10 [label="gini = 0.1499\nsamples = 147\nvalue = [135, 12]\nclass = None", fillcolor="#e58139e8"] ;
+6 -> 10 ;
+11 [label="gini = 0.1855\nsamples = 145\nvalue = [130, 15]\nclass = None", fillcolor="#e58139e2"] ;
+3 -> 11 ;
+12 [label="gini = 0.4295\nsamples = 948\nvalue = [652, 296]\nclass = None", fillcolor="#e581398b"] ;
+2 -> 12 ;
+13 [label="gini = 0.4848\nsamples = 865\nvalue = [357, 508]\nclass = Encapsulant discoloration", fillcolor="#399de54c"] ;
+1 -> 13 ;
+14 [label="Climate3 Desert <= 0.5\ngini = 0.3087\nsamples = 3261\nvalue = [622, 2639]\nclass = Encapsulant discoloration", fillcolor="#399de5c3"] ;
+0 -> 14 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+15 [label="gini = 0.0644\nsamples = 30\nvalue = [29, 1]\nclass = None", fillcolor="#e58139f6"] ;
+14 -> 15 ;
+16 [label="gini = 0.2997\nsamples = 3231\nvalue = [593, 2638]\nclass = Encapsulant discoloration", fillcolor="#399de5c6"] ;
+14 -> 16 ;
+}
