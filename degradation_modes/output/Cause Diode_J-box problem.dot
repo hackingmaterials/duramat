@@ -1,0 +1,8 @@
+digraph Tree {
+node [shape=box, style="filled", color="black"] ;
+0 [label="Mounting rack <= 0.5\ngini = 0.1419\nsamples = 11046\nvalue = [10197, 849]\nclass = None", fillcolor="#e58139ea"] ;
+1 [label="gini = 0.2578\nsamples = 5487\nvalue = [4653, 834]\nclass = None", fillcolor="#e58139d1"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="gini = 0.0054\nsamples = 5559\nvalue = [5544, 15]\nclass = None", fillcolor="#e58139fe"] ;
+0 -> 2 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+}
