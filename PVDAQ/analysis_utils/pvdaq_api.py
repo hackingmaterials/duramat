@@ -1,9 +1,13 @@
-'''
-API wrapper for the PVDAQ website
-'''
+"""API wrapper for the PVDAQ database
+
+This API wrapper has the capability to get raw and aggregate
+PV data for a specific site given a specific set of dates.
+
+"""
 
 import requests
 import pandas as pd
+
 
 class PVDAQ_API(object):
     """
@@ -21,10 +25,34 @@ class PVDAQ_API(object):
         self.form_ = 'json'
 
     def sites(self, options, result_dict=True):
-        """
-        call api to get site metadata info
+        """call API to get site metadata info
 
-        arguments:
+        Get site metadata which includes:
+            comments (str): notes about site
+            confidential (bool): is site confidential
+            inverter_mfg (str): inverter manufacturer name
+            inverter_mfg_hide (bool): is inverter manufacturer confidential
+            inverter_model (str): model no. of inverter
+            inverter_model_hide (bool): is inverter model confidential
+            module_mfg (str): pv module manufacturer
+            module_mfg_hide (bool): is module manufacturer confidential
+            module_model (str): model no. of module
+            module_model_hide (bool): is module model confidential
+            site_power (float): power of site (kW?)
+            site_power_hide (bool): is site power confidential
+            module_tech (int): classification of module technology
+            name_private (str): name of site
+            name_public (str): name of site
+            site_area (float): site of area (m^2)
+            site_azimuth (float): azimuthal angle of site (degrees)
+            site_elevation (float): elevation of site (m?)
+            site_latitude (float): latitude of site (degrees)
+            site_longitude (float): longitude of site (degrees)
+            site_title (float): tilt of pv site (degrees)
+            system_id (int): unique id of site
+
+
+        Parameters:
             options (dict)
                 parameters for api call
                 acceptable options are:
@@ -45,7 +73,7 @@ class PVDAQ_API(object):
         returns:
             dict (of json response) or dict of output data
         """
-        url = self.base_url_ + 'sites' + '.' + self.form_
+        url = self.base_url_ + 'sites.' + self.form_
         options['api_key'] = self.api_key_
         required = ['api_key', 'system_id']
         for requirement in required:
@@ -87,7 +115,7 @@ class PVDAQ_API(object):
         returns:
             either dict (of json response) or dataframe
         """
-        url = self.base_url_ + 'data' + '.' + self.form_
+        url = self.base_url_ + 'data.' + self.form_
         options['api_key'] = self.api_key_
         required = ['api_key', 'system_id', 'start_date', 'end_date']
         for requirement in required:
@@ -122,7 +150,7 @@ class PVDAQ_API(object):
         returns:
             either dict (of json response) or dataframe
         """
-        url = self.base_url_ + 'site_data' + '.' + self.form_
+        url = self.base_url_ + 'site_data.' + self.form_
         options['api_key'] = self.api_key_
         required = ['api_key', 'system_id', 'start_date', 'end_date', 'aggregate']
         for requirement in required:
