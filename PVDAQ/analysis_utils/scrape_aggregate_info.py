@@ -1,11 +1,10 @@
 
 
-import pvdaq_api
 import sys
-# import pandas as pd
-import datetime
 import collections
 import argparse
+import pvdaq_api
+
 
 # formats for output
 FORMAT = ('csv', 'json')
@@ -22,18 +21,23 @@ SITES = [2, 3, 4, 10, 17, 18, 33, 34, 35, 38,
          1425, 1429]
 
 
-def main(argv):
+def make_parser():
     description = 'Script to collect aggregate data from PVDAQ website.'
     parser = argparse.ArgumentParser(description=description)
     required_named = parser.add_argument_group('required named arguments')
-    required_named.add_argument('-k', '--key', default=None, required=True, help='PVDAQ API key needed to access site data.')
+    required_named.add_argument('-k', '--key', default=None, required=True,
+                                help='PVDAQ API key needed to access site data.')
     required_named.add_argument('-p', '--period', default=None, required=True,
                                 help='Time period of the aggregation for which to get data. Options are {}.'.format(','.join(PERIODS)))
     parser.add_argument('-f', '--format', default='csv', required=False,
                         help='Format of saved file.  Options are {}.'.format(','.join(FORMAT)))
     parser.add_argument('-sid', '--system_id', default=None, required=False, nargs='*',
                         help='Specific system_id(s) separated by spaces. Options are {}.'.format(','.join([str(x) for x in SITES])))
+    return parser
 
+
+def main(argv):
+    parser = make_parser()
     args = parser.parse_args(argv)
     key = args.key
     period = args.period
@@ -47,19 +51,19 @@ def main(argv):
     else:
         sites = [int(x) for x in args.system_id]
         if not all(i in SITES for i in sites):
-            raise ValueError('sites must be one of the following: {}'.format(','.join([str(x) for x in SITES])))
-    scrape_aggregate_data(key, period, sites, fileformat)
+            raise ValueError('sites must be one of the following: {}'
+                             .format(','.join([str(x) for x in SITES])))
+    api = pvdaq_api.PVDAQ_API(key)
+    scrape_aggregate_data(api, period, sites, fileformat)
 
 
-def scrape_aggregate_data(key, period, sites, fileformat):
-    '''
+def scrape_aggregate_data(api, period, sites, fileformat):
+    '''Get aggregated site data
     gather aggregated site data from PVDAQ for a given period of aggregation
     will print any sites to a CSV in the current directory.
 
     each site is given up to 2 chances for a successful call.  script will exit if
     failing sites reach 2 attemps.
-
-    TODO: add functionality so users can additional API options that are currently not offered
 
     arguments:
         key (str)
@@ -72,34 +76,16 @@ def scrape_aggregate_data(key, period, sites, fileformat):
     returns:
         None
     '''
-    api = pvdaq_api.PVDAQ_API(key)
     failed_counts = collections.defaultdict(int)
 
     while sites:
         site = sites.pop(0)
-        print('{}'.format(site))
-        try:
-            info = api.sites({'system_id': site})
-        except:
-            sites.append(site)
-            continue
-
-        min_yr = min(info['available_years'])
-        min_date = datetime.date(min_yr, 1, 1)
-        max_yr = max(info['available_years'])
-        if max_yr == datetime.date.today().year:
-            max_date = datetime.date.today()
-        else:
-            max_date = datetime.date(max_yr, 12, 31)
-        min_date = min_date.strftime('%m/%d/%Y')
-        max_date = max_date.strftime('%m/%d/%Y')
 
         try:
-            agg_data = api.aggregate({'system_id': site,
-                                      'start_date': min_date,
-                                      'end_date': max_date,
-                                      'aggregate': period})
-            # df = pd.DataFrame.from_dict(agg_data)
+            agg_data = api.aggregated_site_data(**{'system_id': site,
+                                                   'start_date': 'origin',
+                                                   'end_date': 'today',
+                                                   'aggregate': period})
             if fileformat == 'csv':
                 agg_data.to_csv('./{}-{}.csv'.format(site, period), index=False)
             elif fileformat == 'json':
@@ -110,13 +96,11 @@ def scrape_aggregate_data(key, period, sites, fileformat):
                 del failed_counts[site]
         except:
             print('error with site {}'.format(site))
-            # failed_counts[site] += 1
-            # if all(i >= 2 for i in failed_counts.values()):
-            #     print('error processing sites: {}'.format(','.join([str(i) for i in failed_counts.keys()])))
-            #     return failed_counts.keys()
-            # sites.append(site)
-            # continue
-    # return failed_counts.keys()
+            failed_counts[site] += 1
+            if all(i > 2 for i in failed_counts.values()):
+                raise RuntimeError('Repeated site failures for sites {}.'.format(failed_counts))
+            sites.append(site)
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])
