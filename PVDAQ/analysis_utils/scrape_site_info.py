@@ -3,11 +3,11 @@ script for collecting site metadata from PVDAQ
 '''
 
 
-import pvdaq_api
-import pandas as pd
 import sys
 import argparse
 from collections import namedtuple
+import pvdaq_api
+import pandas as pd
 
 # constants for system_ids and geographic/climate data gathered by hand
 # site Koppen-Geiger climate class gotten from
@@ -43,37 +43,39 @@ def main(argv):
     required_named.add_argument('-k', '--key', default=None, required=True, help='PVDAQ API key needed to access site data.')
     args = parser.parse_args(argv)
     key = args.key
-    scrape_site_data(key)
-
-
-def scrape_site_data(key):
-    '''
-    gather site data metadata from PVDAQ.  data will be printed as CSV file in current directory.
-    metadata is augmented with climate class, 'nearest' city, and state (all gathered by hand)
-
-    arguments:
-        key (str)
-            API key for accessing PVDAQ site
-
-    returns:
-        None
-    '''
     api = pvdaq_api.PVDAQ_API(key)
+    scrape_site_data(api)
+
+
+def scrape_site_data(api):
+    '''Gather site data metadata from PVDAQ.
+
+    Data will be printed as CSV file in current directory.
+    Metadata is augmented with climate class, 'nearest' city, and state (all gathered by hand).
+
+    Parameters
+    ----------
+    api: object
+            PVDAQ API object
+    '''
     master_df = None
     for site in SITES:
-        info = api.sites({'system_id': site})
-        site_df = pd.DataFrame.from_dict(info)
-        site_df['climate'] = SITES[site].climate
-        site_df['metro_area'] = SITES[site].metro_area
-        site_df['state'] = SITES[site].state
-        site_df['country'] = 'USA'
+        info = api.sites_metadata(**{'system_id': site})
+        info['min_year'] = min([int(x) for x in info['available_years']])
+        info['max_year'] = max([int(x) for x in info['available_years']])
+        info['climate'] = SITES[site].climate
+        info['metro_area'] = SITES[site].metro_area
+        info['state'] = SITES[site].state
+        info['country'] = 'USA'
+        del info['available_years']
+        # print(info)
+        site_df = pd.DataFrame(info, index=[0])
         if master_df is None:
             master_df = site_df
         else:
-            master_df = pd.concat([master_df, site_df])
+            master_df = pd.concat([master_df, site_df], ignore_index=True)
     master_df.to_csv('./site-info.csv', index=False)
 
 
 if __name__ == '__main__':
     main(sys.argv[1:])
-
