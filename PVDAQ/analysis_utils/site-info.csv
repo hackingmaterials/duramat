@@ -1,0 +1,38 @@
+climate,comments,confidential,country,inverter_mfg,inverter_model,max_year,metro_area,min_year,module_mfg,module_model,module_tech,name_private,name_public,site_area,site_azimuth,site_elevation,site_latitude,site_longitude,site_power,site_tilt,state,system_id
+BSk,,False,USA,Fronius,IG 4000,2017,Denver,2010,Sharp,ND-208U1,2,"Nelson Home, Golden, CO, Array 1",[2] Residential #1a,22.82,181.2,1675.0,39.7214,105.0972,2912.0,18.5,CO,2
+BSk,,False,USA,Fronius,IG 3000,2017,Denver,2010,UniSolar,PVL-136,3,"Nelson Home, Golden, CO, Array 2",[3] Residential #1b,43.23,181.2,1675.0,39.7214,105.0972,2720.0,18.5,CO,3
+BSk,,False,USA,SMA,1800,2017,Denver,2007,Sanyo,HIP 200-BA3,1,"OTF, Sanyo1",[4] NREL x-Si #1,5.896,180.0,1795.3,39.7406,105.1774,1000.0,40.0,CO,4
+BSk,Parallel string configuration,False,USA,,,2017,Denver,2012,,,6,"OTF, Stion1",[1289] NREL CIGS#12,15.33,180.0,1793.7,39.7405,105.1774,,40.0,CO,1289
+BSk,,False,USA,SMA,,2017,Denver,2000,Shell Solar,Eclipse 80,7,"OTF, Shell Eclipse 80",[10] NREL CIS #1,12.065,180.0,1792.8,39.7404,105.1774,1120.0,40.0,CO,10
+BSk,"Dirk Jordan home system, data logging on Obvius Acquisuite. Two rows of 11 modules.",False,USA,SMA,SB-4000US,2013,Golden,1969,Sharp,NU-235,2,Dirk Jordan Obvius logger,[1292] Residential #2,35.864,155.0,1840.0,39.766,105.2387,5170.0,22.6,CO,1292
+Cfa,,False,USA,Trace Engineering,SW4048UPV,2004,Lakeland,1998,Siemens,SP75,1,FSEC - Zero Energy House - Lakeland,[1229] FSEC - Zero Energy House - Lakeland,34.15,240.0,58.0,28.0392,81.95,4050.0,33.3,FL,1229
+Csa,,False,USA,AES,GC-100,2007,Livermore,2002,Astropower,AP-100,1,FSEC - Zero Energy House - Livermore,[1230] FSEC - Zero Energy House - Livermore,35.147,180.0,150.0,37.6478,121.7742,3600.0,,CA,1230
+Cfa,,False,USA,Trace Engineering,SW4048UPV,2006,Daytona Beach,2000,Uni-Solar,PVL-120,10,FSEC - Zero Energy House - New Smyrna Beach,[1231] FSEC - Zero Energy House - New Smyrna Beach,55.27,270.0,2.0,29.0258,80.9274,3360.0,20.0,FL,1231
+Dfb,,False,USA,,,2017,Burlington,2014,,,,"RTC,VT,Met Station","[1424] RTC,VT,Met Station",,180.0,109.0,44.4664,73.1024,,0.0,VT,1424
+BSk,,True,USA,Trace,,2012,Denver,1998,USSC,Roof Shingle,8,"OTF, USSC Roof (System 2)",[17] NREL a-Si #2,19.881,180.0,1793.4,39.7405,105.1728,1200.0,40.0,CO,17
+BSk,UMG Silicon,True,USA,PV Powered,,2017,Denver,2010,Canadian Solar,,9,"OTF, Canadian Solar (UMG Si)",[18] NREL umg-Si #1,9.644,180.0,1794.7,39.7406,105.1774,1260.0,40.0,CO,18
+BSk,,False,USA,SMA America,Sunny Central 250U,2017,Denver,2012,SunPower,SPR-315E-WHT,1,NREL Research Support Facility II,[1283] NREL Research Support Facility II,2115.84,165.0,1800.0,39.7409,105.1711,408240.0,10.0,CO,1283
+Cfa,,False,USA,SatCon Technology,Power Gate Plus 250kW,2014,Trenton,2011,Suntech,STP-280,2,SES - Jay Franco,[1236] Integrator #2 - Site E,2049.01,190.0,250.0,40.374,74.469,295680.0,10.0,NJ,1236
+Dfb,"Baseline system, 30 degree tilt. 2 strings",False,USA,,,2017,Burlington,2014,Suniva,OPT270-60 BLK-BLK,,"RTC,VT,Baseline","[1422] RTC,VT,Baseline",,180.0,109.0,44.4665,73.1014,6000.0,35.0,VT,1422
+Dfb,CDP site,False,USA,Solectria,PVI 13kW,2017,Presque Isle,2011,Sharp,ND-U224C1,2,Univ. of Maine - Presque Isle,[1239] Univ. of Maine - Presque Isle,146.7144,155.0,197.0,46.6704,68.0178,20160.0,10.0,ME,1239
+BSk,Parallel string configuration,False,USA,,,2015,Denver,2012,,,6,"OTF, Solar Frontier",[1284] NREL CIGS#11,8.497,180.0,1793.7,39.7405,105.1774,,40.0,CO,1284
+BWh,"Baseline system, 30 degree tilt. 2 strings",False,USA,,,2017,Henderson,2015,Suniva,OPT270-60 BLK-BLK,,"RTC,NV,Baseline","[1423] RTC,NV,Baseline",,180.0,697.0,36.0275,114.9215,6000.0,35.0,NV,1423
+BSk,,False,USA,SMA,Sunny Boy 3000US,2017,Denver,2010,Silicor Materials,240,9,"OTF, Calisolar (System 1)",[33] Silicor Materials,15.76,180.0,1794.5,39.7404,105.1772,2400.0,40.0,CO,33
+BSk,Having repeated problems with inverter main board failures.,False,USA,SatCon Technology,135kW,2017,Denver,2010,Sharp ,NU-U240F1,1,Andre Agassi Preparatory Academy - Building A,[34] Andre Agassi Preparatory Academy - Building A,996.0278,180.0,620.0,36.1952,115.1582,146640.0,11.2,CO,34
+BSk,,False,USA,SatCon Technology,135kW,2017,Denver,2010,Sharp ,NU-U240F1,1,Andre Agassi Preparatory Academy - Gymnasium,[35] Andre Agassi Preparatory Academy - Gymnasium,826.4911,270.0,620.0,36.1952,115.1582,121680.0,,CO,35
+BSk,Positive Array Only (since inception),True,USA,SMA,,2017,Denver,1995,"Solar Cells, Inc.",50W Prototype Module,5,"OTF, SCI1, Pos Array Only (since 6/95)",[38] NREL CdTe #1d,8.688,180.0,1794.7,39.7406,105.1773,600.0,30.0,CO,38
+BSk,Combines both the parallel and series configurations in a single data set. Parallel data to be scaled,False,USA,,,2003,Denver,1995,Mobil,Ra 280-50H,4,"OTF, ASE, Series and Corrected Parallel Configurations (since 2/95)",[39] NREL Ribbon Si #1c,7.429,180.0,1792.2,39.7407,105.1773,1400.0,40.0,CO,39
+Cfa,,True,USA,,,2017,Titusville,2014,,,,"RTC,FSEC,Met Station","[1389] RTC,FSEC Met Station",,180.0,12.0,28.405,80.7709,,0.0,FL,1389
+Cfa,,False,USA,,,2017,Baltimore,2010,,,2,Distributed Sun - Hunt Valley,[1199] Distributed Sun - Hunt Valley,366.544,180.0,325.0,39.4856,76.6636,52920.0,20.0,MD,1199
+BWh,,False,USA,,,2017,Henderson,2014,,,,"RTC,NV,Met Station","[1425] RTC,NV,Met Station",,180.0,697.0,36.0275,114.9215,,0.0,NV,1425
+BSk,,False,USA,Fronius,IG 4500-LV,2017,Denver,1994,Siemens,M55 c-SI,,"SERF, Serf East Systems",[50] NREL x-Si #6,,158.0,1994.7,39.742,105.1727,6000.0,45.0,CO,50
+BSk,,False,USA,Fronius,IG 4500-LV,2017,Denver,1994,Siemens,M55 c-Si,,"SERF, Serf West Systems",[51] NREL x-Si #7,,158.0,1994.7,39.7416,105.1734,6000.0,45.0,CO,51
+BSk,"Array tilt is a weighted average of the two tilts (main array at 10 deg, south facade at 60 deg)",False,USA,Satcon,"PVS-500(x2), PVS-135(x1)",2017,Golden,2013,SunPower,"318W(x3136), 315W(496)",1,NREL Parking Garage,[1332] NREL Parking Garage,5922.7534,180.0,1770.0,39.7388,105.1732,1153488.0,16.77,CO,1332
+BSk,,True,USA,,,2017,Albuquerque,2015,,,,"RTC,SNL,Met Station","[1405] RTC,SNL Met Station",,,1658.0,35.0549,106.5433,,,NM,1405
+BSk,,False,USA,,,2012,Salt Lake City,2011,Kyocera,KD210GX-LPU,1,Campbell Scientific Headquarters - 2-Axis Tracker,[1207] Campbell Scientific Headquarters - 2-Axis Tracker,95.04,,1382.0,41.7356,111.8336,13440.0,,UT,1207
+BSk,,False,USA,SMA America,Sunny Central 250U,2017,Denver,2011,SunPower,SPR-315E,1,NREL Visitor Parking Structure,[1208] NREL Visitor Parking Structure,2713.5081,165.0,1780.0,39.7407,105.1694,524160.0,9.1,CO,1208
+Cfa,"Baseline system, 30 degree tilt. 2 strings",True,USA,,,2017,Titusville,2014,Suniva,OPT270-60 BLK-BLK,,"RTC,FSEC,Baseline","[1403] RTC,FSEC,Baseline",,180.0,12.0,28.405,80.7709,6000.0,35.0,FL,1403
+BWh,,False,USA,SatCon Technology,50kW,2017,Las Vegas,2011,Sharp ,NU-U240F1,1,Andre Agassi Preparatory Academy - Building B,[1276] Andre Agassi Preparatory Academy - Building B,410.8104,180.0,620.0,36.1952,115.1582,68480.0,5.0,NV,1276
+BWh,,False,USA,SatCon Technology,30kW,2017,Las Vegas,2011,Sharp ,NU-U240F1,1,Andre Agassi Preparatory Academy - Building C,[1277] Andre Agassi Preparatory Academy - Building C,275.5038,180.0,620.0,36.1952,115.1582,40560.0,10.0,NV,1277
+BWh,,False,USA,SatCon Technology,"(1) 100kW, (1) 50kW",2017,Las Vegas,2011,Sharp ,NU-U240F1,1,Andre Agassi Preparatory Academy - Building D Car Port,[1278] Andre Agassi Preparatory Academy - Building D,1163.9628,180.0,620.0,36.1952,115.1582,171360.0,0.0,NV,1278
+BSk,"Baseline system, 30 degree tilt. 2 strings",False,USA,,,2017,Albuquerque,6,Suniva,OPT270-60 BLK-BLK,,"RTC,SNL,Baseline","[1429] RTC,SNL,Baseline",,180.0,1658.0,35.0549,106.5433,6000.0,35.0,NM,1429

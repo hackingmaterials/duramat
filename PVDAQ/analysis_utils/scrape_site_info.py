@@ -52,11 +52,16 @@ def scrape_site_data(api):
 
     Data will be printed as CSV file in current directory.
     Metadata is augmented with climate class, 'nearest' city, and state (all gathered by hand).
+    Site data is printed to current working directory as site-info.csv
 
     Parameters
     ----------
     api: object
-            PVDAQ API object
+        PVDAQ API object
+
+    Returns
+    -------
+    None
     '''
     master_df = None
     for site in SITES:

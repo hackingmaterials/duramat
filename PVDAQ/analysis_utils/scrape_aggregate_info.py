@@ -58,23 +58,27 @@ def main(argv):
 
 
 def scrape_aggregate_data(api, period, sites, fileformat):
-    '''Get aggregated site data
-    gather aggregated site data from PVDAQ for a given period of aggregation
+    '''Get aggregated site data.
+
+    Gather aggregated site data from PVDAQ for a given period of aggregation
     will print any sites to a CSV in the current directory.
 
-    each site is given up to 2 chances for a successful call.  script will exit if
-    failing sites reach 2 attemps.
+    Each site is given up to 2 chances for a successful call.  Data is printed
+    to current directory using following convention:
+        {site}-{period}.{fileformat}
 
-    arguments:
-        key (str)
-            API key for accessing PVDAQ site
-        period (str)
-            period for which aggregation occurred
-        sites (list-like of ints)
-            list of system_ids to gather data from
+    Parameters
+    ----------
+    api: object
+        PVDAQ_API object
+    period: str
+        period for which aggregation occurred
+    sites: list-like of ints
+        list of system_ids to gather data from
 
-    returns:
-        None
+    Returns
+    -------
+    None
     '''
     failed_counts = collections.defaultdict(int)
 
