@@ -16,6 +16,7 @@ import pandas as pd
 climate_location = namedtuple('climate_location', ['climate', 'metro_area', 'state'])
 
 # keys are allowed system_ids (gotten by hand - check back for additional sites)
+# this list needs to be updated - skipping the climate, metro_area, and state for now
 SITES = {2:    climate_location('BSk', 'Denver', 'CO'),              3: climate_location('BSk', 'Denver', 'CO'),
          4:    climate_location('BSk', 'Denver', 'CO'),             10: climate_location('BSk', 'Denver', 'CO'),
          17:   climate_location('BSk', 'Denver', 'CO'),             18: climate_location('BSk', 'Denver', 'CO'),
@@ -52,29 +53,34 @@ def scrape_site_data(api):
 
     Data will be printed as CSV file in current directory.
     Metadata is augmented with climate class, 'nearest' city, and state (all gathered by hand).
+    Site data is printed to current working directory as site-info.csv
 
     Parameters
     ----------
     api: object
-            PVDAQ API object
+        PVDAQ API object
+
+    Returns
+    -------
+    None
     '''
-    master_df = None
-    for site in SITES:
+    df_list = []
+    for site in api.allowed_system_ids:
         info = api.sites_metadata(**{'system_id': site})
-        info['min_year'] = min([int(x) for x in info['available_years']])
-        info['max_year'] = max([int(x) for x in info['available_years']])
-        info['climate'] = SITES[site].climate
-        info['metro_area'] = SITES[site].metro_area
-        info['state'] = SITES[site].state
-        info['country'] = 'USA'
-        del info['available_years']
-        # print(info)
-        site_df = pd.DataFrame(info, index=[0])
-        if master_df is None:
-            master_df = site_df
+        if len(info['available_years']) > 0:
+            info['min_year'] = min([int(x) for x in info['available_years']])
+            info['max_year'] = max([int(x) for x in info['available_years']])
         else:
-            master_df = pd.concat([master_df, site_df], ignore_index=True)
-    master_df.to_csv('./site-info.csv', index=False)
+            info['min_year'] = None
+            info['max_year'] = None
+        # info['climate'] = SITES[site].climate
+        # info['metro_area'] = SITES[site].metro_area
+        # info['state'] = SITES[site].state
+        # info['country'] = 'USA'
+        del info['available_years']
+        df_list.append(pd.DataFrame(info))
+    master_df = pd.concat(df_list, axis=1).T
+    master_df.to_csv('./site-info.csv')
 
 
 if __name__ == '__main__':

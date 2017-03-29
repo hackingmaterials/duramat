@@ -6,9 +6,11 @@ PV data for a specific site given a specific set of dates.
 """
 
 import datetime
-import collections
+# import collections
+
 import requests
 import numpy as np
+import pandas as pd
 
 
 class PVDAQ_API(object):
@@ -21,7 +23,9 @@ class PVDAQ_API(object):
     def __init__(self, api_key):
         """initialize object
 
-        Base url and API key are set.
+        Base url and API key are set.  Allowed system_ids also defined here.
+        API calls require a valid system ID be set and so far, there seems to be
+        no way to fetch them.
 
         Parameters
         ----------
@@ -30,12 +34,27 @@ class PVDAQ_API(object):
         """
         self.base_url_ = 'http://developer.nrel.gov/api/pvdaq/v3/'
         self.api_key_ = api_key
-        self.allowed_system_ids = [2, 3, 4, 10, 17, 18, 33, 34, 35, 38,
-                                   39, 50, 51, 1199, 1207, 1208, 1229,
-                                   1230, 1231, 1236, 1239, 1276, 1277,
-                                   1278, 1283, 1284, 1289, 1292, 1332,
-                                   1389, 1403, 1405, 1422, 1423, 1424,
-                                   1425, 1429]
+        # self.allowed_system_ids = [2, 3, 4, 10, 17, 18, 33, 34, 35, 38,
+        #                            39, 50, 51, 1199, 1207, 1208, 1229,
+        #                            1230, 1231, 1236, 1239, 1276, 1277,
+        #                            1278, 1283, 1284, 1289, 1292, 1332,
+        #                            1389, 1403, 1405, 1422, 1423, 1424,
+        #                            1425, 1429]
+        self.allowed_system_ids = (2, 3, 4, 10, 18, 33, 34, 35, 39, 50,
+                                   51, 53, 54, 55, 57, 58, 59, 1199, 1200,
+                                   1201, 1202, 1203, 1204, 1207, 1208, 1214,
+                                   1216, 1218, 1219, 1220, 1221, 1222, 1223,
+                                   1224, 1225, 1226, 1229, 1230, 1231, 1232,
+                                   1233, 1234, 1235, 1236, 1237, 1239, 1244,
+                                   1245, 1246, 1247, 1248, 1249, 1250, 1251,
+                                   1252, 1253, 1254, 1255, 1256, 1257, 1258,
+                                   1259, 1260, 1261, 1262, 1263, 1264, 1265,
+                                   1266, 1267, 1268, 1269, 1270, 1271, 1272,
+                                   1273, 1274, 1275, 1276, 1277, 1278, 1283,
+                                   1284, 1289, 1292, 1332, 1389, 1403, 1405,
+                                   1418, 1419, 1420, 1422, 1423, 1424, 1425,
+                                   1429, 1430, 1431, 1432, 1433)
+
 
     def sites_metadata(self, r_format='json', api_key=None, system_id=None, user_id=None, raw_response=False):
         """call API to get site metadata info
@@ -64,13 +83,7 @@ class PVDAQ_API(object):
             site_title (float): tilt of pv site (degrees)
             system_id (int): unique id of site
 
-        Allowed system_id values (gathered by hand)
-            [2, 3, 4, 10, 17, 18, 33, 34, 35, 38,
-             39, 50, 51, 1199, 1207, 1208, 1229,
-             1230, 1231, 1236, 1239, 1276, 1277,
-             1278, 1283, 1284, 1289, 1292, 1332,
-             1389, 1403, 1405, 1422, 1423, 1424,
-             1425, 1429]
+        For allowed system_id values (gathered by hand) see self.allowed_system_ids
 
 
         Parameters
@@ -93,7 +106,7 @@ class PVDAQ_API(object):
 
         Returns
         -------
-        result: dict
+        result: pandas Series or dict
             contains site metadata (detailed above) or raw json response
         """
         if r_format != 'json':
@@ -114,13 +127,13 @@ class PVDAQ_API(object):
         if raw_response:
             result = response
         else:
-            result = response['outputs'][0]
+            result = pd.Series(response['outputs'][0])
 
         return result
 
     def raw_site_data(self, r_format='json', api_key=None, system_id=None, start_date=None, end_date=None,
                       user_id=None, raw_response=False, step_size=14):
-        """Get raw data for given site and date range
+        """Get raw data for given site and date range.
 
         Data includes the following (by default):
             SiteID (int)
@@ -132,6 +145,10 @@ class PVDAQ_API(object):
             module_temp_1 (float)
             das_temp (float)
             das_batter_voltage (float)
+
+        This function performs repeated requests.  The current implementation
+        is rather slow.  An obvious improvement is to make the serial requests
+        asynchronous/parallel.
 
         Parameters
         ----------
@@ -148,7 +165,8 @@ class PVDAQ_API(object):
             end date for data in MM/DD/YYYY format
             if end_date = 'today', current date will be used
         user_id: str, optional
-            only for admin accounts.  will return all sites belonging to this id.
+            only for admin accounts.
+            will return all sites belonging to this id.
         raw_response: bool, optional
             True:
                 returns all response of requests.get
@@ -173,15 +191,14 @@ class PVDAQ_API(object):
         req_params['system_id'] = self.system_id_check_(system_id)
 
         start_date, end_date = self.date_range_check_(start_date, end_date, system_id)
-        # req_params['start_date'] = start_date
-        # req_params['end_date'] = end_date
 
         if user_id is not None:
             req_params['user_id'] = str(user_id)
 
+        url = self.base_url_ + 'data.' + r_format
+
         # cannot get all site data in single block
         # will grab monthly blocks
-        print(start_date, end_date)
         date_init = datetime.datetime.strptime(start_date, '%m/%d/%Y').date()
         date_final = datetime.datetime.strptime(end_date, '%m/%d/%Y').date()
         step_size = datetime.timedelta(days=step_size)
@@ -193,32 +210,29 @@ class PVDAQ_API(object):
             date_add_step_fmat = date_add_step.strftime('%m/%d/%Y')
             req_params['start_date'] = date_init_fmat
             req_params['end_date'] = date_add_step_fmat
-            # print('\t' + date_init_fmat, date_add_step_fmat)
-            # t0 = datetime.datetime.now()
-            url = self.base_url_ + 'data.' + r_format
             response = self.base_api_call_(url, req_params)
-            # print('\tapi response ' + str((datetime.datetime.now() - t0) / 60))
-            # t0 = datetime.datetime.now()
             if raw_response:
                 response.append(response)
             else:
                 responses.append(self.parse_response_outputs_to_dict_(response, call='raw'))
-            # print('\tprocessing complete ' + str((datetime.datetime.now() - t0) / 60))
 
             date_init += step_size + datetime.timedelta(days=1)
 
         if raw_response:
             result = responses
         else:
-            result = collections.defaultdict(list)
-            for parsed_response in responses:
-                for key in parsed_response:
-                    result[key].extend(parsed_response[key])
+            result = pd.concat(responses)
+            # result = collections.defaultdict(list)
+            # for parsed_response in responses:
+            #     for key in parsed_response:
+            #         result[key].extend(parsed_response[key])
 
         return result
 
-    def aggregated_site_data(self, r_format='json', api_key=None, system_id=None, start_date=None, end_date=None,
-                             aggregate=None, limit_fields=[], user_id=None, raw_response=False):
+    def aggregated_site_data(self, r_format='json', api_key=None, system_id=None,
+                             start_date=None, end_date=None,
+                             aggregate=None, limit_fields=[],
+                             user_id=None, raw_response=False):
         """Get aggregated data for given site and date range
 
         Data includes the following (by default):
@@ -268,7 +282,8 @@ class PVDAQ_API(object):
             specify specific data fields to get (listed above)
             by defualt, all are returned (even if empty)
         user_id: str, optional
-            only for admin accounts.  will return all sites belonging to this id.
+            only for admin accounts.
+            will return all sites belonging to this id.
         raw_response: bool, optional
             True:
                 returns all response of requests.get
@@ -278,7 +293,8 @@ class PVDAQ_API(object):
         Returns
         -------
         result: dict
-            contains response.get response or desired aggregate data (detailed above)
+            contains response.get response or
+            desired aggregate data (detailed above)
         """
         if r_format != 'json':
             raise NotImplementedError('Only json response format is supported at this time.')
@@ -443,26 +459,29 @@ class PVDAQ_API(object):
 
         Returns
         -------
-        result: dict
-            organized as {key1: [values1...], key2: [values2...], ...}
+        result: pandas DataFrame
+            data is stored columnwise
         """
-        if call is None:
-            raise ValueError('Call must be either aggregate or raw.')
         # columns stored as first element in list
         # data is stored row by row as sublists
         # aggregate outputs field and raw outputs
-        # fields slightly differ for some reason...
+        # fields slightly differ...
         if call == 'aggregate':
             keys = np.asarray(response['outputs'][0])
             data = np.asarray(response['outputs'][1:])
-        if call == 'raw':
+        elif call == 'raw':
             keys = np.asarray(response['outputs']['data'][0])
             data = np.asarray(response['outputs']['data'][1:])
+        else:
+            raise ValueError('Call must be either aggregate or raw.')
         # use standard python objects in dict
-        result = {}
-        for key, vec in zip(keys, data.T):
-            result[key] = list(vec)
-
+        # result = {}
+        # for key, vec in zip(keys, data.T):
+        #     result[key] = list(vec)
+        if len(data) == 0:
+            result = pd.DataFrame()
+        else:
+            result = pd.DataFrame(data=data, columns=keys)
         return result
 
     @staticmethod
