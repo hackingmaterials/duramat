@@ -138,56 +138,12 @@ def clean_and_print_data(df):
     
     Will modify this data frame in place
     
+    After, prints the cleaned data into a new CSV file
+    
     Args:
-        df (data frame): Data frame to be modified
+        df (data frame): Data frame to be cleaned and printed
     """
-    # Changing some values to NaN ('nan', '*', 'Unknown', 'unknown')
-    df.replace(to_replace='(\A)(\*|Unknown|unknown|nan)(\Z)', value=np.nan, regex=True, inplace=True)
-    
-    # Dropping empty rows
-    df.dropna(how='all', inplace=True)
-    
-    # Removing dupliacte rows
-    # df.drop_duplicates(keep='first', inplace=True)
-    
-    # Data typing the columns
-    for c in df.columns:
-        if c in numeric_columns:
-            df[c] = pd.to_numeric(df[c], errors='coerce')
-        
-    # Removing inconsistencies from State/Town column
-    df.replace(to_replace={'State/Town':corrected_locations}, inplace=True)
-    
-    # Applying normal mix capitalization to State/Town column
-    # df.replace(to_replace=PUT_REGEX_IDENTIFYING_STATE_TOWN, value=PUT_REGEX_APPLYING_CAPITALIZATION)
-    
-    # Make a new column for the cleaned version of the Cause column
-    col_location = df.columns.get_loc('Cause') + 1
-    df.insert(col_location, 'Cause (Cleaned)', df['Cause'])
-    
-    # Remove any spaces on either side of semi-colon seperators in Cause (Cleaned) column for more accuracte string matching
-    # Ex. a; b ; c  ->  a;b;c
-    df['Cause (Cleaned)'] = df['Cause (Cleaned)'].replace(to_replace='(; )|( ;)', value=';', regex=True)
-    
-    # Replace all known representations of degredation modes in Cause (Cleaned) column with their designated values
-    for mode in mode_dictionary.keys():
-        df['Cause (Cleaned)'] = df['Cause (Cleaned)'].replace(
-           to_replace='(\A|;)(' + mode_dictionary[mode] + ')(\Z|;)',
-           value=';' + mode + ';', regex=True)
-        
-    # Strip all leading and trailing semi-colons in Cause (Cleaned) column
-    df['Cause (Cleaned)'] = df['Cause (Cleaned)'].replace(to_replace='\A;|;\Z', value='', regex=True)
-    
-    # Transform values in Cause (Cleaned) column into lists of strings, split on the semi-colons
-    df['Cause (Cleaned)'] = df['Cause (Cleaned)'].str.split(pat=';')
-    
-    # Clean the System/module column for all instances of "system", change to "System"
-    df['System/module'] = df['System/module'].replace(to_replace='system', value='System')
-    
-    # Clean the System/module column for all instance of "Module" when the No.Modules column has a value > 1
-    df.loc[(df['System/module'] == 'Module') & (df['No.modules'] > 1), ['System/module']] = 'System'
-    
-    # TODO: Normalize the Mounting column
+    clean_data(df)
     
     # Print the cleaned DataFrame to a CSV in the project directory
     df_print = df
