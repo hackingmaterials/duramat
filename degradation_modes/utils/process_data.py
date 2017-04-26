@@ -22,6 +22,10 @@ from sklearn.tree import DecisionTreeClassifier, export_graphviz
 from sklearn.cross_validation import cross_val_score
 from sklearn.grid_search import GridSearchCV
 
+# Ignore warnings for regex with match groups
+import warnings
+warnings.filterwarnings("ignore", 'This pattern has match groups')
+
 # List of all columns that need to be typed to numeric
 numeric_columns = ['System size (kW)', 'Years', 'Begin.Year',
                   'Ref year', 'Elevation (m)', 'Latitude',
@@ -126,6 +130,17 @@ def clean_data(df):
     
     # Transform values in Cause (Cleaned) column into lists of strings, split on the semi-colons
     df['Cause (Cleaned)'] = df['Cause (Cleaned)'].str.split(pat=';')
+    
+    # Set column location for new dummy variables columns
+    col_location = df.columns.get_loc('Cause (Cleaned)') + 1
+    
+    # Create dummy variable columns for each of the degradation modes
+    for mode in mode_dictionary.keys():
+        col_name = mode
+        df.insert(col_location, col_name, df['Cause'])
+        df[col_name] = df[col_name].replace(to_replace='(; )|( ;)', value=';', regex=True)
+        df[col_name] = df[col_name].str.contains('(\A|;)(' + mode_dictionary[mode] + ')(\Z|;)', na=False, regex=True)
+        df[col_name] = df[col_name].astype(int)
     
     # Clean the System/module column for all instances of "system", change to "System"
     df['System/module'] = df['System/module'].replace(to_replace='system', value='System')
