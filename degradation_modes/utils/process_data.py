@@ -1,26 +1,10 @@
-import io, os, sys, types, subprocess, collections
+import os, sys, collections
 
 # Import Pandas
 import pandas as pd
-import matplotlib.pyplot as plt
-#%matplotlib inline
-
-# Import Plotly and Cufflinks
-# Plotly username and API key should be set in environment variables
-import plotly
-plotly.tools.set_credentials_file(username=os.environ['PLOTLY_USERNAME'], api_key=os.environ['PLOTLY_KEY'])
-import plotly.graph_objs as go
-import cufflinks as cf
 
 # Import numpy
 import numpy as np
-
-# Import SciKit decision tree
-from sklearn.tree import DecisionTreeClassifier, export_graphviz
-
-# Import Scikit cross-validation function
-from sklearn.cross_validation import cross_val_score
-from sklearn.grid_search import GridSearchCV
 
 # Ignore warnings for regex with match groups
 import warnings

@@ -1,6 +1,6 @@
 digraph Tree {
 node [shape=box, style="filled", color="black"] ;
-0 [label="Climate3 Moderate <= 0.5\ngini = 0.0477\nsamples = 11046\nvalue = [10776, 270]\nclass = None", fillcolor="#e58139f9"] ;
+0 [label="Moderate <= 0.5\ngini = 0.0477\nsamples = 11046\nvalue = [10776, 270]\nclass = None", fillcolor="#e58139f9"] ;
 1 [label="gini = 0.1037\nsamples = 4924\nvalue = [4654, 270]\nclass = None", fillcolor="#e58139f0"] ;
 0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
 2 [label="gini = 0.0\nsamples = 6122\nvalue = [6122, 0]\nclass = None", fillcolor="#e58139ff"] ;

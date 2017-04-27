@@ -1,7 +1,7 @@
 digraph Tree {
 node [shape=box, style="filled", color="black"] ;
-0 [label="Mounting 1-axis tracker <= 0.5\ngini = 0.4944\nsamples = 11046\nvalue = [6110, 4936]\nclass = None", fillcolor="#e5813931"] ;
-1 [label="gini = 0.456\nsamples = 7785\nvalue = [5047, 2738]\nclass = None", fillcolor="#e5813975"] ;
+0 [label="1-axis tracker <= 0.5\ngini = 0.4944\nsamples = 11046\nvalue = [6109, 4937]\nclass = None", fillcolor="#e5813931"] ;
+1 [label="gini = 0.4561\nsamples = 7785\nvalue = [5046, 2739]\nclass = None", fillcolor="#e5813975"] ;
 0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
 2 [label="gini = 0.4394\nsamples = 3261\nvalue = [1063, 2198]\nclass = Hot spots", fillcolor="#399de584"] ;
 0 -> 2 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;

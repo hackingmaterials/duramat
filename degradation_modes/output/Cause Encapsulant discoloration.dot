@@ -1,6 +1,6 @@
 digraph Tree {
 node [shape=box, style="filled", color="black"] ;
-0 [label="Mounting 1-axis tracker <= 0.5\ngini = 0.4464\nsamples = 11046\nvalue = [7331, 3715]\nclass = None", fillcolor="#e581397e"] ;
+0 [label="1-axis tracker <= 0.5\ngini = 0.4464\nsamples = 11046\nvalue = [7331, 3715]\nclass = None", fillcolor="#e581397e"] ;
 1 [label="gini = 0.2382\nsamples = 7785\nvalue = [6709, 1076]\nclass = None", fillcolor="#e58139d6"] ;
 0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
 2 [label="gini = 0.3087\nsamples = 3261\nvalue = [622, 2639]\nclass = Encapsulant discoloration", fillcolor="#399de5c3"] ;
