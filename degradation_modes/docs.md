@@ -1,7 +1,7 @@
 # Full code documentation
 
 ## utils/process_data.py
-```
+```python
 def encode_list(l):
     """
     In order to remove u'' unicode tag from entries in a string array once printed, this function converts a
@@ -35,7 +35,7 @@ def clean_and_print_data(df):
 ```
 
 ## utils/degradation_utils.py
-```
+```python
 def get_total_modules(df, weighted):
     """
         Return the total number of modules in the provided DataFrame
@@ -78,7 +78,7 @@ def get_mode_percentage(df, mode, weighted):
 ```
 
 ## classification_models_analysis.ipynb
-```
+```python
 def get_classification_model_data(df, modes):
     """
     Build a DataFrame that holds all of the information for building naive bayes models
@@ -158,7 +158,7 @@ def generate_naive_bayes_models(df, features, modes):
 ```
 
 ## climate_and_mounting_analysis.ipynb
-```
+```python
 def get_mounting_graph_data(df, modes, mountings, weighted):
     """
     Generate a DataFrame that holds percentage of modules with degradation modes based on mounting types
@@ -201,7 +201,7 @@ def generate_mounting_categorical_dot_plot(modes, rack, one_axis, roof, single_a
 ```
 
 ## correlating_modes_analysis.ipynb
-```
+```python
 def get_mode_correlation_percent(df, mode_1, mode_2, weighted):
     """
     Return the percent of rows where two modes are seen together
