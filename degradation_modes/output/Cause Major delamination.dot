@@ -1,8 +1,12 @@
 digraph Tree {
 node [shape=box, style="filled", color="black"] ;
-0 [label="Mounting rack <= 0.5\ngini = 0.4555\nsamples = 11046\nvalue = [3875, 7171]\nclass = Major delamination", fillcolor="#399de575"] ;
-1 [label="gini = 0.4987\nsamples = 5487\nvalue = [2603, 2884]\nclass = Major delamination", fillcolor="#399de519"] ;
+0 [label="rack <= 0.5\ngini = 0.4555\nsamples = 11046\nvalue = [3875, 7171]\nclass = Major delamination", fillcolor="#399de575"] ;
+1 [label="Desert <= 0.5\ngini = 0.4987\nsamples = 5487\nvalue = [2603, 2884]\nclass = Major delamination", fillcolor="#399de519"] ;
 0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
-2 [label="gini = 0.3529\nsamples = 5559\nvalue = [1272, 4287]\nclass = Major delamination", fillcolor="#399de5b3"] ;
-0 -> 2 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+2 [label="gini = 0.3382\nsamples = 2236\nvalue = [1754, 482]\nclass = None", fillcolor="#e58139b9"] ;
+1 -> 2 ;
+3 [label="gini = 0.3859\nsamples = 3251\nvalue = [849, 2402]\nclass = Major delamination", fillcolor="#399de5a5"] ;
+1 -> 3 ;
+4 [label="gini = 0.3529\nsamples = 5559\nvalue = [1272, 4287]\nclass = Major delamination", fillcolor="#399de5b3"] ;
+0 -> 4 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
 }

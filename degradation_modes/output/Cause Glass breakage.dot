@@ -1,6 +1,6 @@
 digraph Tree {
 node [shape=box, style="filled", color="black"] ;
-0 [label="Mounting rack <= 0.5\ngini = 0.1096\nsamples = 11046\nvalue = [10403, 643]\nclass = None", fillcolor="#e58139ef"] ;
+0 [label="rack <= 0.5\ngini = 0.1096\nsamples = 11046\nvalue = [10403, 643]\nclass = None", fillcolor="#e58139ef"] ;
 1 [label="gini = 0.1833\nsamples = 5487\nvalue = [4927, 560]\nclass = None", fillcolor="#e58139e2"] ;
 0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
 2 [label="gini = 0.0294\nsamples = 5559\nvalue = [5476, 83]\nclass = None", fillcolor="#e58139fb"] ;
