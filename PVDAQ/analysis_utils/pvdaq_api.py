@@ -191,6 +191,8 @@ class PVDAQ_API(object):
         req_params['system_id'] = self.system_id_check_(system_id)
 
         start_date, end_date = self.date_range_check_(start_date, end_date, system_id)
+        if any(i is None for i in (start_date, end_date)):
+            return None
 
         if user_id is not None:
             req_params['user_id'] = str(user_id)
@@ -210,11 +212,12 @@ class PVDAQ_API(object):
             date_add_step_fmat = date_add_step.strftime('%m/%d/%Y')
             req_params['start_date'] = date_init_fmat
             req_params['end_date'] = date_add_step_fmat
+            print(date_init_fmat, date_add_step_fmat)
             response = self.base_api_call_(url, req_params)
             if raw_response:
                 response.append(response)
             else:
-                responses.append(self.parse_response_outputs_to_dict_(response, call='raw'))
+                responses.append(self.parse_response_outputs_to_df_(response, call='raw'))
 
             date_init += step_size + datetime.timedelta(days=1)
 
@@ -314,6 +317,8 @@ class PVDAQ_API(object):
         req_params['system_id'] = self.system_id_check_(system_id)
 
         start_date, end_date = self.date_range_check_(start_date, end_date, system_id)
+        if any(i is None for i in (start_date, end_date)):
+            return None
         req_params['start_date'] = start_date
         req_params['end_date'] = end_date
 
@@ -337,7 +342,7 @@ class PVDAQ_API(object):
         if raw_response:
             result = response
         else:
-            result = self.parse_response_outputs_to_dict_(response, call='aggregate')
+            result = self.parse_response_outputs_to_df_(response, call='aggregate')
 
         return result
 
@@ -378,8 +383,12 @@ class PVDAQ_API(object):
             metadata = self.sites_metadata(system_id=system_id)
 
         if start_date == 'origin':
-            year = min(metadata['available_years'])
-            start_date = datetime.date(year, 1, 1).strftime('%m/%d/%Y')
+            try:
+                year = min(metadata['available_years'])
+                start_date = datetime.date(year, 1, 1).strftime('%m/%d/%Y')
+            except ValueError as e:
+                print('API metadata does not have information on available years.')
+                return None, None
         else:
             try:
                 _ = datetime.datetime.strptime(start_date, '%m/%d/%Y').date()
@@ -388,8 +397,12 @@ class PVDAQ_API(object):
                                  format(start_date))
 
         if end_date == 'today':
-            latest_year = max(metadata['available_years'])
-            today = datetime.date.today()# .strftime('%m/%d/%Y')
+            try:
+                latest_year = max(metadata['available_years'])
+                today = datetime.date.today()# .strftime('%m/%d/%Y')
+            except ValueError as e:
+                print('API metadata does not have information on available years.')
+                return None, None
             if latest_year < today.year:
                 end_date = datetime.date(latest_year, 12, 31).strftime('%m/%d/%Y')
             else:
@@ -446,7 +459,7 @@ class PVDAQ_API(object):
             api_key = self.api_key_
         return api_key
 
-    def parse_response_outputs_to_dict_(self, response, call=None):
+    def parse_response_outputs_to_df_(self, response, call=None):
         """Parses json response from API call to dict of lists.
 
         Parameters

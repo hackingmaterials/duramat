@@ -6,95 +6,76 @@ import scipy
 import statsmodels.api as smapi
 
 
-def get_outlier_indices_zscore(series):
-    '''
-    returns indices of a series where outliers exist based on zscore
+def get_outlier_indices_zscore(series, cutoff=3):
+    '''Returns indices of a series where |zscore| > cutoff.
 
-    arguments:
-        series (pd.Series)
+    Arguments
+    ---------
+    series: pd.Series
+        Data for which outlier indices will be found and returned.
+    cutoff: float
+        Limit of zscore cutoff.  Zscores greater than this value are outliers.
 
-    returns:
-        array of indices
+    Returns
+    -------
+    series: pd.Series of indices
     '''
     this_site = series.dropna()
-    this_site = pd.DataFrame(this_site, columns=[this_site.name])
-    this_site['zscore'] = calc_zscore(this_site)
-    indices = this_site[np.abs(this_site['zscore']) > 3].index
-    return indices
-
-
-# def get_outlier_indices_mod_zscore(series):
-#     '''
-#     returns indices of a series where outliers exist based on
-#     modified zscore
-#     arguments:
-#         series (pd.Series)
-#
-#     returns:
-#         array of indices
-#     '''
-#     this_site = series.dropna()
-#     this_site = pd.DataFrame(this_site, columns=['data'])
-#     this_site['mod_zscore'] = calc_modified_zscore(series)
-#     indices = this_site[np.abs(this_site['mod_zscore']) > 3.5].index
-#     return indices
+    # this_site = pd.DataFrame(this_site, columns=[this_site.name])
+    zscore = pd.Series(calc_zscore(this_site))
+    zscore.index = this_site.index
+    return zscore[np.abs(zscore) > cutoff].index
 
 
 def calc_zscore(series):
-    '''
-    calculate zscore of each element of a series using scipy
+    '''Calculate zscore of each element of a series using scipy.
 
-    aguments:
-        series (pd.Series)
+    Arguments
+    ---------
+    series: pd.Series
+        Data to calculate zscore on.
 
-    returns:
-        array with zscore corresponding to each element of series
+    Returns
+    -------
+    series: pd.Series of calculated zscore
     '''
     this_site = series.dropna().values
     return scipy.stats.zscore(this_site)
 
 
-# def calc_modified_zscore(series):
-#     '''
-#     returns indices of a series where outliers exist based on
-#     modified zscore (http://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm)
-#
-#     m_i = 0.6745 * (x_i - median(x)) / median(abs(x_i - median(x)))
-#     any absolute m_i > 3.5 is considered an outlier
-#
-#     aguments:
-#         series (pd.Series)
-#
-#     returns:
-#         array with zscore corresponding to each element of series
-#     '''
-#     this_site = series.dropna().values
-#     this_site = 0.6745 * (this_site - np.median(this_site))
-#     this_site /= np.median(np.abs(this_site - np.median(this_site)))
-#     return this_site
-
-
 def longest_streak_indices(series, sample_time='D'):
-    '''
-    find the longest consecutive streak of non-NaN in a pandas series
-    as of now, only finds the first longest instance
+    '''Find the longest consecutive streak of non-NaN in a series.
 
-    arguments:
-        series (pd.Series)
-            indices of series should be time
-        sampe_time (str)
-            frequency of the time series entries
+    Right now, only finds first longest instance.
 
-    returns:
-        start index, stop index
+    Arguments
+    ---------
+    series: pd.Series
+        Time series data.
+    sample_time: str
+        Frequency of the time series entries.
+
+    Returns
+    -------
+    start_index: pd.Series timeindex
+        Index of first element in longest streak.
+    stop_index: pd.Series timeindex
+        Index of final element in longest streak.
     '''
     time_delta = pd.Timedelta(1, sample_time)
 
     # trim nans that may be on either side of the data
     tmp_series = series[series.first_valid_index(): series.last_valid_index()]
+    if len(tmp_series) == 1:
+        return tmp_series.index[0], tmp_series.index[0]
+    elif len(tmp_series) == 0:
+        raise ValueError('Received empty series')
 
     # find locations of nan values
-    nan_loc = tmp_series[tmp_series.isnull()]
+    nan_loc = tmp_series[pd.isnull(tmp_series)]
+
+    if len(nan_loc) == 0:
+        return tmp_series.index[0], tmp_series.index[-1]
 
     # assume longest streak is start of original series to first nan value
     longest_streak = nan_loc.index[0] - tmp_series.index[0]
@@ -119,45 +100,52 @@ def longest_streak_indices(series, sample_time='D'):
     return index_start, index_stop
 
 
-def ts_numeric_ratio(series):
+def ts_numeric_ratio(series, include_inf=False):
+    '''Calculate the ratio of numeric values to non-numeric values (nan, inf).
+
+    Only consides "internal" nan/inf by trimming padded nan values.
+
+    Arguments
+    ---------
+    series: pd.Series
+        Time series data.
+
+    Returns
+    -------
+    ratio: float
+        Ratio of numeric data to total length of data.
     '''
-    calculate the ratio of numeric values to non-numeric values (nan, inf)
-
-    arguments:
-        series (pd series)
-            indices of series should be time
-        sampe_time (str)
-            frequency of the time series entries
-
-    returns:
-        float of # numeric values / # of all values in between first and last numeric values
-    '''
-    # only consider 'internal' data -- exclude any padded nan/inf values
-    # padding can happen when series are stored together in a dataframe with different
-    # time ranges
-    this_site = series[series.first_valid_index(): series.last_valid_index()]
-    return len(this_site.dropna()) / len(this_site)
+    # this_site = series[series.first_valid_index(): series.last_valid_index()]
+    # ratio = len(this_site.dropna()) / len(this_site)
+    if include_inf:
+        this_site = series
+    else:
+        this_site = series.replace([np.inf, -np.inf], np.nan)
+    ratio = len(this_site.dropna()) / len(this_site)
+    return ratio
 
 
-def get_out_of_range_indices(series, low=-np.inf, low_inclusive=True,
-                                     high=np.inf, high_inclusive=True):
-    '''
-    returns indices of values that are outside of the low, high range
+def get_out_of_range_indices(series, low=-np.inf, low_inclusive=True, high=np.inf, high_inclusive=True):
+    '''Returns indices of values that are outside of the low, high range in a series.
 
-    arguments:
-        series (pd.Series)
-        low (float)
-            low limit of values
-        low_inclusive (bool=True)
-            True  = [low...high
-            False = (low...high
-        high (float)
-            high limit of values
-            True  = low...high]
-            False = low...high)
+    Arguments
+    ---------
+    series: pd.Series
+        Data to inspect.
+    low: float
+        low limit of values
+    low_inclusive: bool
+        True  = [low...high
+        False = (low...high
+    high: float
+        high limit of values
+    high_inclusive: bool
+        True  = low...high]
+        False = low...high)
 
-    returns:
-        indices of values that are outside the specified range
+    Returns
+    -------
+    pd.Series indices
     '''
     if low > high:
         low, high = high, low
@@ -174,18 +162,113 @@ def get_out_of_range_indices(series, low=-np.inf, low_inclusive=True,
             return series[(series <= low) | (series >= high)].index
 
 
-def ts_ols(series):
+def ts_data_quality(this_site, edit_indices=None, edit_val=np.nan):
+    '''Caclulates data quality metrics of time series data.
+
+    The function will calculate the percentage of non-NaN data, the span of the
+    data (in days, weeks, months, and years), and the longest consecutive streak of datapoints
+    (in days, weeks, months, and years).  These metrics can be used to cutoff small data
+    sets or data sets with many missing values.
+
+    This function can also edit certain indices to be a certain value for the purpose
+    of removing outliers or restricting data be be in a certain range, etc.
+
+    Arguments
+    ---------
+    this_site: pd.Series
+        Time series data.
+    edit_indices: pd.Index
+        Indices of values to edit.
+    edit_val: numeric
+        The value to substitute at edit_indices.
+
+    Returns
+    -------
+    quality: pd.Series
+        Quality of data that gives percent of data that is non-NaN, span of data, and longest
+        consecutive non-NaN streak of data.
     '''
-    perform ordinary least squares fit on time series data
+    this_site = this_site[this_site.first_valid_index(): this_site.last_valid_index()].copy()
+    # print(this_site.name, len(this_site))
+    if edit_indices is not None:
+        this_site[[x for x in edit_indices if x in this_site.index]] = edit_val
+    if this_site.dropna().empty:
+        pct, span, longest_streak = 0, 0, 0
+    else:
+        pct = ts_numeric_ratio(this_site)
+        span = (this_site.index[-1] - this_site.index[0]).days
+        start, stop = longest_streak_indices(this_site, sample_time='D')
+        longest_streak = (stop - start).days + 1
+    quality = pd.Series([pct, span, span / 7, span / 30.5, span / 365,
+                        longest_streak, longest_streak / 7, longest_streak / 30.5, longest_streak / 365],
+                        index=['pct', 'span (D)', 'span (W)', 'span (M)', 'span (Y)',
+                               'longest_streak (D)', 'longest_streak (W)',
+                               'longest_streak (M)', 'longest_streak (Y)'], name=this_site.name)
+    return quality
 
-    arguments:
-        series (pd.Series)
 
-    returns:
-        dictionary of results
-            b: slope of linear fit (in )
+def df_data_quality(df, indices_filter_method=None, edit_val=np.nan, *args, **kwargs):
+    '''Caclulates quality of mulitple time series data sets stored in a dataframe.
+
+    The data quality can be calculated for multiple time series datasets here (stored
+    in a dataframe).  With this function, it is also possible to select a function to
+    filter indices (e.g. get_outlier_indices_zscore, get_out_of_range_indices).
+
+    Arguments
+    ---------
+    df: pd.DataFrame
+        Assumed to be multiple time series datasets in single dataframe.
+    indices_filter_method: function
+        Function that returns indices to be changed to edit_val.
+    edit_val: numeric
+        Value to change indices to (if filter method is used).
+    *args, **kwargs:
+        Used for passing extra arguments to indices_filter_method if needed.
+
+    Returns
+    -------
+    quality_df: pd.DataFrame
+        The quality of each series is a column in dataframe.
     '''
+    series_list = []
+    for site in sorted(df.keys()):
+        this_site = df[site]
+        if this_site.dropna().empty:
+            continue
+        if indices_filter_method is not None:
+            indices = indices_filter_method(this_site, *args, **kwargs)
+        else:
+            indices = None
+        quality = ts_data_quality(this_site, indices, edit_val)
+        if np.all(quality.values == 0.):
+            continue
+        else:
+            series_list.append(quality)
+    quality_df = pd.concat(series_list, axis=1)
+    return quality_df
 
+
+def ts_ols(series, ols_kwargs={}):
+    '''Perform ordinary least squares fit on time series data using statsmodels.
+
+    The slope will be in terms of days.
+
+    Arguments
+    ---------
+    series: pd.Series
+        Time series data on which OLS will be fit to.
+    ols_kwargs: dict
+        Keyword arguments for OLS call.
+
+    Returns
+    -------
+    output: dict
+        Includes slope (m: float),
+                 intercept (b: float),
+                 rsquared: float,
+                 rmse: float,
+                 fit model (model: RegressionResult object)
+    '''
     this_site = series.dropna()
 
     # reression always in terms of days
@@ -193,7 +276,7 @@ def ts_ols(series):
     X = smapi.add_constant(X)
 
     # build and fit model
-    model = smapi.OLS(this_site.values, exog=X, hasconst=True)
+    model = smapi.OLS(this_site.values, exog=X, hasconst=True, **ols_kwargs)
     model = model.fit()
 
     # gather OLS parameters, errors
@@ -205,19 +288,28 @@ def ts_ols(series):
     return output
 
 
-def calc_degredation_rate_ols(series):
-    '''
-    calculate degradation rate of time series data using OLS
-    this function could be modified to use other methods of calculated degradation rate
-    and serve more as a wrapper function
+def calc_degredation_rate_ols(series, ols_kwargs={}):
+    '''Calculate yearly degradation (percent change) rate of time series data using OLS.
 
-    arguments:
-        series (pd.Series)
+    Degradation rate is calculated as follows:
+        100 * (m / b) *  365
 
-    returns:
-        dictionary of OLS results and degradation rate
+    Where m and b are the slope and intercept from an OLS, respectively.  Slope is always
+    calculated in terms of days.  Degradation rate is calculated for yearly basis.
+
+    Arguments
+    ---------
+    series: pd.Series
+        Time series data.
+    ols_kwargs: dict
+        Keyword arguments for ordinary least squares.
+
+    Returns
+    -------
+    ols_result: dict
+        Adds degradation rate (deg_rate: float) to result of ts_ols function.
     '''
-    ols_result = ts_ols(series)
+    ols_result = ts_ols(series, ols_kwargs=ols_kwargs)
 
     # calcualte degradation rate per year  b / m * 365 * 100
     deg_rate = ols_result['m'] / ols_result['b'] * 100 * 365
@@ -226,25 +318,38 @@ def calc_degredation_rate_ols(series):
     return ols_result
 
 
-def ts_csd(series):
-    '''
-    perorm classical seasonal decomposition on a time-series
+def ts_seasonal_decomp(series, resample_time='D', sd_kwargs={}):
+    '''Perform classical seasonal decomposition on time series.
 
-    arguments:
-        series (pd.Series)
-            series is sampled monthly
+    Decomposition uses statsmodels.  Series will be resampled (using mean).
+    NaN values raise errors with CSD, so missing values are interpolated (linearly for now).
 
-    returns:
-        fill in
+
+    Arguments
+    ---------
+    series: pd.Series
+        Time series to be seasonally decomposed.
+    resample_time: str
+        How to resample the time series (D=daily, W=weekly, M=monthly).
+    sd_kwargs: dict
+        Keyword arguments for seasonal decomposition.
+
+    Returns
+    -------
+    output: dict
+        Contains CSD results, which is the seasonal, trend, and residual values.
+        Each is a numpy array.
     '''
-    # resample data on monthly basis
-    # (daily and weekly works too - can add options)
-    # use linear interpolation to fill in missing values
-    # csd cannot have missing values
+    resample_time = resample_time.upper()
+    trend_freq_dict = {'D': 365, 'W': 52, 'M': 12}
+    if resample_time not in ('D', 'W', 'M'):
+        raise NotImplementedError('Only daily (D), weekly (W), and monthly (M) supported now.')
+    trend_freq = trend_freq_dict[resample_time]
+
     this_site = series[series.first_valid_index(): series.last_valid_index()].\
-                resample('D').mean().interpolate()
+                resample(resample_time).mean().interpolate()
 
-    result = smapi.tsa.seasonal_decompose(this_site, freq=365)
+    result = smapi.tsa.seasonal_decompose(this_site, freq=trend_freq, **sd_kwargs)
 
     # build dictionary of output
     output = {'seasonal': result.seasonal,
@@ -254,57 +359,90 @@ def ts_csd(series):
     return output
 
 
-def calc_degredation_rate_csd(series):
-    '''
-    calculate degradation rate of time series data
-    first a csd is performed to extract the overall trend of the data
-    then an OLS regression is performed on the trend and used to compute
-    percent degradation
+def calc_degredation_rate_seasonal_decomp(series, resample_time='D', sd_kwargs={}, ols_kwargs={}):
+    '''Calculate degradation rate of on the trend of a seasonally decomposed time series.
 
-    arguments:
-        series (pd.Series)
+    Arguments
+    ---------
+    series: pd.Series
+        Time series data.
+    resample_time: str
+        How to resample the time series (D=daily, W=weekly, M=monthly).
+    sd_kwargs:
+        Keyword arguments for seasonal decomposition.
+    ols_kwargs:
+        Keyword arguments for ordinary least squares decomposition.
 
-    returns:
-        dictionary of OLS results and degradation rate
+    Returns
+    -------
+    result: dict
+        Result of ts_ols performed on the trend of a CSD.
     '''
     # perform csd to get
     # seasonality, trend, and residual factors
-    csd_result = ts_csd(series)
+    csd_result = ts_seasonal_decomp(series, resample_time=resample_time, sd_kwargs=sd_kwargs)
 
     # perform ols to get linear estimate of csd trend
-    return calc_degredation_rate_ols(csd_result['trend'])
+    result = calc_degredation_rate_ols(csd_result['trend'], ols_kwargs)
+    return result
+    # return calc_degredation_rate_ols(csd_result['trend'])
 
 
-def ts_lowess(series):
-    '''
-    perform LOcally WEighted Scatterplot Smoothing on time series
+def ts_lowess(series, resample_time='D', lowess_kwargs={}):
+    '''Perform LOcally WEighted Scatterplot Smoothing on time series.
 
-    arguments:
-        series (pd.Series)
+    Missing values must be interpolated (right now this is done linearly).
 
-    returns:
-        pd.Series of lowess datapoints
+    Arguments
+    ---------
+    series: pd.Series
+        Time series data.
+    resample_time: str
+        How to resample the time series (D=daily, W=weekly, M=monthly).
+    lowess_kwargs: dict
+        Keyword arguments for LOWESS.
+
+    Returns
+    -------
+    result: pd.Series:
+        Time series of LOWESS points.
     '''
     # interpolate missing values - could also drop but smoothness of
     # fit would suffer
     this_site = series[series.first_valid_index(): series.last_valid_index()].\
-                resample('D').mean().interpolate()
+                resample(resample_time).mean().interpolate()
 
     # perform regression and return as time series
-    result = smapi.nonparametric.lowess(this_site.values, this_site.index)
+    result = smapi.nonparametric.lowess(this_site.values, this_site.index, **lowess_kwargs)
     result = pd.Series(result[:, 1], index=this_site.index)
     return result
 
 
-def calc_degredation_rate_lowess(series):
-    '''
-    calculate degradate rate of time series data
-    first, a lowess fit is generated on a given series
-    then an OLS regression is performed on the lowess fit
-    to compute percent degradation
+def calc_degredation_rate_lowess(series, resample_time='D', lowess_kwargs={}, ols_kwargs={}):
+    '''Calculate degradate rate of LOWESS trend for time series data.
+
+    Arguments
+    ---------
+    series: pd.Series
+        Time series data.
+    resample_time: str
+        How to resample the time series (D=daily, W=weekly, M=monthly).
+    lowess_kwargs: dict
+        Keyword arguments for LOWESS.
+    ols_kwargs: dict
+        Keyword arguments for OLS.
+
+    Returns
+    -------
+    ols_result: dict
+        Result of of calc_degradation_rate_ols done on the LOWESS trend.
     '''
     # perform lowess regression
-    lowess_result = ts_lowess(series)
+    lowess_result = ts_lowess(series, resample_time, lowess_kwargs)
 
     # perform ols to get linear estimate of trend
-    return calc_degredation_rate_ols(lowess_result)
+    ols_result = calc_degredation_rate_ols(lowess_result, ols_kwargs)
+    return ols_result
+    # return calc_degredation_rate_ols(lowess_result)
+
+

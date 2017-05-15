@@ -17,25 +17,25 @@ climate_location = namedtuple('climate_location', ['climate', 'metro_area', 'sta
 
 # keys are allowed system_ids (gotten by hand - check back for additional sites)
 # this list needs to be updated - skipping the climate, metro_area, and state for now
-SITES = {2:    climate_location('BSk', 'Denver', 'CO'),              3: climate_location('BSk', 'Denver', 'CO'),
-         4:    climate_location('BSk', 'Denver', 'CO'),             10: climate_location('BSk', 'Denver', 'CO'),
-         17:   climate_location('BSk', 'Denver', 'CO'),             18: climate_location('BSk', 'Denver', 'CO'),
-         33:   climate_location('BSk', 'Denver', 'CO'),             34: climate_location('BSk', 'Denver', 'CO'),
-         35:   climate_location('BSk', 'Denver', 'CO'),             38: climate_location('BSk', 'Denver', 'CO'),
-         39:   climate_location('BSk', 'Denver', 'CO'),             50: climate_location('BSk', 'Denver', 'CO'),
-         51:   climate_location('BSk', 'Denver', 'CO'),           1199: climate_location('Cfa', 'Baltimore', 'MD'),
-         1207: climate_location('BSk', 'Salt Lake City', 'UT'),   1208: climate_location('BSk', 'Denver', 'CO'),
-         1229: climate_location('Cfa', 'Lakeland', 'FL'),         1230: climate_location('Csa', 'Livermore', 'CA'),
-         1231: climate_location('Cfa', 'Daytona Beach', 'FL'),    1236: climate_location('Cfa', 'Trenton', 'NJ'),
-         1239: climate_location('Dfb', 'Presque Isle', 'ME'),     1276: climate_location('BWh', 'Las Vegas', 'NV'),
-         1277: climate_location('BWh', 'Las Vegas', 'NV'),        1278: climate_location('BWh', 'Las Vegas', 'NV'),
-         1283: climate_location('BSk', 'Denver', 'CO'),           1284: climate_location('BSk', 'Denver', 'CO'),
-         1289: climate_location('BSk', 'Denver', 'CO'),           1292: climate_location('BSk', 'Golden', 'CO'),
-         1332: climate_location('BSk', 'Golden', 'CO'),           1389: climate_location('Cfa', 'Titusville', 'FL'),
-         1403: climate_location('Cfa', 'Titusville', 'FL'),       1405: climate_location('BSk', 'Albuquerque', 'NM'),
-         1422: climate_location('Dfb', 'Burlington', 'VT'),       1423: climate_location('BWh', 'Henderson', 'NV'),
-         1424: climate_location('Dfb', 'Burlington', 'VT'),       1425: climate_location('BWh', 'Henderson', 'NV'),
-         1429: climate_location('BSk', 'Albuquerque', 'NM')}
+# SITES = {2:    climate_location('BSk', 'Denver', 'CO'),              3: climate_location('BSk', 'Denver', 'CO'),
+#          4:    climate_location('BSk', 'Denver', 'CO'),             10: climate_location('BSk', 'Denver', 'CO'),
+#          17:   climate_location('BSk', 'Denver', 'CO'),             18: climate_location('BSk', 'Denver', 'CO'),
+#          33:   climate_location('BSk', 'Denver', 'CO'),             34: climate_location('BSk', 'Denver', 'CO'),
+#          35:   climate_location('BSk', 'Denver', 'CO'),             38: climate_location('BSk', 'Denver', 'CO'),
+#          39:   climate_location('BSk', 'Denver', 'CO'),             50: climate_location('BSk', 'Denver', 'CO'),
+#          51:   climate_location('BSk', 'Denver', 'CO'),           1199: climate_location('Cfa', 'Baltimore', 'MD'),
+#          1207: climate_location('BSk', 'Salt Lake City', 'UT'),   1208: climate_location('BSk', 'Denver', 'CO'),
+#          1229: climate_location('Cfa', 'Lakeland', 'FL'),         1230: climate_location('Csa', 'Livermore', 'CA'),
+#          1231: climate_location('Cfa', 'Daytona Beach', 'FL'),    1236: climate_location('Cfa', 'Trenton', 'NJ'),
+#          1239: climate_location('Dfb', 'Presque Isle', 'ME'),     1276: climate_location('BWh', 'Las Vegas', 'NV'),
+#          1277: climate_location('BWh', 'Las Vegas', 'NV'),        1278: climate_location('BWh', 'Las Vegas', 'NV'),
+#          1283: climate_location('BSk', 'Denver', 'CO'),           1284: climate_location('BSk', 'Denver', 'CO'),
+#          1289: climate_location('BSk', 'Denver', 'CO'),           1292: climate_location('BSk', 'Golden', 'CO'),
+#          1332: climate_location('BSk', 'Golden', 'CO'),           1389: climate_location('Cfa', 'Titusville', 'FL'),
+#          1403: climate_location('Cfa', 'Titusville', 'FL'),       1405: climate_location('BSk', 'Albuquerque', 'NM'),
+#          1422: climate_location('Dfb', 'Burlington', 'VT'),       1423: climate_location('BWh', 'Henderson', 'NV'),
+#          1424: climate_location('Dfb', 'Burlington', 'VT'),       1425: climate_location('BWh', 'Henderson', 'NV'),
+#          1429: climate_location('BSk', 'Albuquerque', 'NM')}
 
 
 def main(argv):
