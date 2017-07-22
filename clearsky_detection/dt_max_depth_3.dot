@@ -1,0 +1,20 @@
+digraph Tree {
+node [shape=box] ;
+0 [label="ratio <= 0.9993\ngini = 0.3989\nsamples = 315552\nvalue = [228714, 86838]\nclass = cloudy"] ;
+1 [label="gini = 0.0\nsamples = 212417\nvalue = [212417, 0]\nclass = cloudy"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="Clearsky GHI <= 193.5\ngini = 0.2661\nsamples = 103135\nvalue = [16297, 86838]\nclass = clear"] ;
+0 -> 2 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+3 [label="Clearsky GHI <= 110.5\ngini = 0.4588\nsamples = 16441\nvalue = [5861, 10580]\nclass = clear"] ;
+2 -> 3 ;
+4 [label="gini = 0.4835\nsamples = 10121\nvalue = [4142, 5979]\nclass = clear"] ;
+3 -> 4 ;
+5 [label="gini = 0.396\nsamples = 6320\nvalue = [1719, 4601]\nclass = clear"] ;
+3 -> 5 ;
+6 [label="GHI <= 456.5\ngini = 0.2118\nsamples = 86694\nvalue = [10436, 76258]\nclass = clear"] ;
+2 -> 6 ;
+7 [label="gini = 0.283\nsamples = 21191\nvalue = [3616, 17575]\nclass = clear"] ;
+6 -> 7 ;
+8 [label="gini = 0.1866\nsamples = 65503\nvalue = [6820, 58683]\nclass = clear"] ;
+6 -> 8 ;
+}
