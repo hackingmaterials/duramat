@@ -1,0 +1,36 @@
+digraph Tree {
+node [shape=box] ;
+0 [label="ratio <= 0.9992\ngini = 0.2529\nsamples = 236664\nvalue = [201519, 35145]\nclass = cloudy"] ;
+1 [label="gini = 0.0\nsamples = 186793\nvalue = [186793, 0]\nclass = cloudy"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="Clearsky GHI <= 327.5\ngini = 0.4162\nsamples = 49871\nvalue = [14726, 35145]\nclass = clear"] ;
+0 -> 2 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+3 [label="Clearsky GHI <= 61.5\ngini = 0.497\nsamples = 15945\nvalue = [7350, 8595]\nclass = clear"] ;
+2 -> 3 ;
+4 [label="GHI <= 44.5\ngini = 0.4816\nsamples = 3463\nvalue = [2064, 1399]\nclass = cloudy"] ;
+3 -> 4 ;
+5 [label="gini = 0.4865\nsamples = 2656\nvalue = [1546, 1110]\nclass = cloudy"] ;
+4 -> 5 ;
+6 [label="gini = 0.4597\nsamples = 807\nvalue = [518, 289]\nclass = cloudy"] ;
+4 -> 6 ;
+7 [label="GHI <= 236.5\ngini = 0.4883\nsamples = 12482\nvalue = [5286, 7196]\nclass = clear"] ;
+3 -> 7 ;
+8 [label="gini = 0.4954\nsamples = 8235\nvalue = [3722, 4513]\nclass = clear"] ;
+7 -> 8 ;
+9 [label="gini = 0.4653\nsamples = 4247\nvalue = [1564, 2683]\nclass = clear"] ;
+7 -> 9 ;
+10 [label="Clearsky GHI <= 509.5\ngini = 0.3403\nsamples = 33926\nvalue = [7376, 26550]\nclass = clear"] ;
+2 -> 10 ;
+11 [label="GHI <= 403.5\ngini = 0.4036\nsamples = 9806\nvalue = [2750, 7056]\nclass = clear"] ;
+10 -> 11 ;
+12 [label="gini = 0.4291\nsamples = 3507\nvalue = [1093, 2414]\nclass = clear"] ;
+11 -> 12 ;
+13 [label="gini = 0.3877\nsamples = 6299\nvalue = [1657, 4642]\nclass = clear"] ;
+11 -> 13 ;
+14 [label="GHI <= 877.5\ngini = 0.31\nsamples = 24120\nvalue = [4626, 19494]\nclass = clear"] ;
+10 -> 14 ;
+15 [label="gini = 0.3019\nsamples = 17892\nvalue = [3315, 14577]\nclass = clear"] ;
+14 -> 15 ;
+16 [label="gini = 0.3324\nsamples = 6228\nvalue = [1311, 4917]\nclass = clear"] ;
+14 -> 16 ;
+}

@@ -51,13 +51,12 @@ def main():
         _ = mf.standard_detection()
         print('standard filtered percentile')
 
+
 class ModelFreeDetect(object):
-    '''Class used to analyze irradiance curves to determine sky clarity.
-    '''
+    """Class used to analyze irradiance curves to determine sky clarity."""
 
     def __init__(self, data, window=30, copy=True):
-        '''Initialize class with data.  Data may be copied (it can be modified during detection).
-        Window size is also set here for calculating properties of measured curve.
+        """Initialize class with data.
 
         Arguments
         ---------
@@ -70,9 +69,9 @@ class ModelFreeDetect(object):
         copy, optional: bool
             Create copy of data or not.
 
-        '''
-        # if len(pd.unique(data.index.to_series().diff().dropna())) != 1:
-        #     raise NotImplementedError('You must use evenly spaced time series data.')
+        """
+        if len(pd.unique(data.index.to_series().diff().dropna())) != 1:
+            raise NotImplementedError('You must use evenly spaced time series data.')
         if copy:
             self.data = data.copy()
         else:
@@ -80,23 +79,23 @@ class ModelFreeDetect(object):
         self.data.index = self.data.index.tz_convert('UTC')
         self.data.name = 'data'
         self._dates = self.data.index.date
-        self.window = window
+        # self.window = window
         self.filter_mask = pd.Series(True, index=self.data.index)
 
     def reset_filter_mask(self, value=True):
-        '''Resets filter mask to desired state (True/False).
+        """Resets filter mask to desired state (True/False).
 
         Arguments
         ---------
         value, optional: bool
             Value for mask to take (True or False).
-        '''
+        """
         if value not in (True, False):
             raise ValueError('Mask value must be bool (True/False).')
         self.filter_mask = pd.Series(value, index=self.data.index)
 
     def generate_window_slices(self, arr):
-        '''Generate arrays for slicing data into windows.
+        """Generate arrays for slicing data into windows.
 
         Arguments
         ---------
@@ -106,13 +105,13 @@ class ModelFreeDetect(object):
         -------
         slices: np.ndarray
             Hankel matrix for slicing data into windows.
-        '''
+        """
         slices = linalg.hankel(np.arange(0, len(arr) - self.window + 1),
                                np.arange(len(arr) - self.window, len(arr)))
         return slices
 
     def calc_window_integral(self, array):
-        '''Calculate integral of array values.
+        """Calculate integral of array values.
 
         Array values are assumed to be y values and dx is assumed to be one.
 
@@ -124,12 +123,12 @@ class ModelFreeDetect(object):
         -------
         val: float
             Integral of array
-        '''
+        """
         val = np.trapz(array)
         return val
 
     def calc_window_diff_coeff_variation(self, array):
-        '''Calculate coefficient of variation of differences for a given window.
+        """Calculate coefficient of variation of differences for a given window.
 
         cv = stdev / |mean|
 
@@ -141,14 +140,16 @@ class ModelFreeDetect(object):
         -------
         cv: float
             Coefficient of variation for array.
-        '''
+        """
         y_diff = np.diff(array)
         cv = np.std(y_diff) / np.abs(np.mean(y_diff))
         return cv
 
     def calc_window_line_length_norm(self, array):
-        '''Calculate normalizedline length of an array.  The points are assumed to
-        be evenly spaced (dx=1).  Line length ar normalized by the
+        """Calculate normalizedline length of an array.
+
+        The points are assumed to be evenly spaced (dx=1).
+        Line length ar normalized by the
         straight line distances between the first and last array elements.
 
         Arguments
@@ -159,14 +160,14 @@ class ModelFreeDetect(object):
         -------
         line_length_norm: float
             Total length line (as described by array) travels normalized by the endpoint-to-endpoint line length.
-        '''
+        """
         line_length = self.calc_window_line_length(array)
-        endpoint_line_length  = np.sqrt(np.square(array[-1] - array[0]) + np.square(len(array) - 1))
+        endpoint_line_length = np.sqrt(np.square(array[-1] - array[0]) + np.square(len(array) - 1))
         line_length_norm = line_length / endpoint_line_length
         return line_length_norm
 
     def calc_window_line_length(self, array):
-        '''Calculate line length of an array.  The points are assumed to
+        """Calculate line length of an array.  The points are assumed to
         be evenly spaced (dx=1).
 
         Arguments
@@ -177,13 +178,13 @@ class ModelFreeDetect(object):
         -------
         line_length: float
             Total length line (as described by array) travels.
-        '''
+        """
         diffs = np.diff(array)
-        line_length = np.sum(np.sqrt(np.square(diffs[:]) + 1)) # 1 for dx
+        line_length = np.sum(np.sqrt(np.square(diffs[:]) + 1))  # 1 for dx
         return line_length
 
     def get_midval(self, array):
-        '''Returns element at the midpoint of an array.
+        """Returns element at the midpoint of an array.
 
         Arguments
         ---------
@@ -193,13 +194,13 @@ class ModelFreeDetect(object):
         -------
         midval: variable
             Element at midpoint of array.
-        '''
+        """
         midpoint = (len(array) // 2)
         midval = array[midpoint]
         return midval
 
     def calc_pct(self, array, metric_tol):
-        '''Calculate percent of array elements that are less than or equal to a tolerance.
+        """Calculate percent of array elements that are less than or equal to a tolerance.
 
         Arguments
         ---------
@@ -209,12 +210,12 @@ class ModelFreeDetect(object):
         -------
         pct: float
             Percent of values that are <= self.metric_tol.
-        '''
+        """
         pct = np.sum((array <= metric_tol).astype(int)) / len(array)
         return pct
 
     def calc_window_avg(self, array, weights=None):
-        '''Calculate average value of array.  Can points can be weighted.
+        """Calculate average value of array.  Can points can be weighted.
 
         Arugments
         ---------
@@ -224,7 +225,7 @@ class ModelFreeDetect(object):
         -------
         val: float
             Mean value of array.
-        '''
+        """
         if weights == 'gaussian':
             center = len(array) // 2
             weights = np.asarray([np.exp(-(i - center)**2 / (2 * 1**2)) for i in range(len(array))])
@@ -234,7 +235,7 @@ class ModelFreeDetect(object):
         return np.average(array, weights=weights)
 
     def calc_window_max(self, array):
-        '''Calculate average value of array.
+        """Calculate average value of array.
 
         Arugments
         ---------
@@ -244,11 +245,11 @@ class ModelFreeDetect(object):
         -------
         val: float
             mean value of array
-        '''
+        """
         return np.max(array)
 
     def calc_window_derivative_std_normed(self, array):
-        '''Calculate std deviation of derivatives of array.  This is normalized
+        """Calculate std deviation of derivatives of array.  This is normalized
         by the average value of irradiance over the time interval.  This metric
         is used in Reno-Hansen detection.  Same as coefficient of variation.
 
@@ -260,14 +261,14 @@ class ModelFreeDetect(object):
         -------
         norm_std: float
             Standard devation of derivatives divided by average array value.
-        '''
+        """
         window_mean = self.calc_window_avg(array)
-        dy = np.diff(array) # diff as that's what Reno-Hansen indicate
-        std_dy = np.std(dy, ddof=1) # dx always 1
+        dy = np.diff(array)  # diff as that's what Reno-Hansen indicate
+        std_dy = np.std(dy, ddof=1)  # dx always 1
         return std_dy / window_mean
 
     def calc_window_derivative_avg(self, array):
-        '''Calculate average derivative of array.
+        """Calculate average derivative of array.
 
         Arguments
         ---------
@@ -277,12 +278,12 @@ class ModelFreeDetect(object):
         -------
         val: float
             average rate of change
-        '''
+        """
         val = np.mean(np.gradient(array))
         return val
 
     def calc_window_derivative_std(self, array):
-        '''Calculate average derivative of array.
+        """Calculate average derivative of array.
 
         Arguments
         ---------
@@ -292,12 +293,12 @@ class ModelFreeDetect(object):
         -------
         val: float
             average rate of change
-        '''
+        """
         val = np.std(np.diff(array))
         return val
 
     def calc_window_max_diff(self, arr1, arr2):
-        '''Calculate the maximum difference between two arrays slopes.
+        """Calculate the maximum difference between two arrays slopes.
         Reno-Hansen call this the slope (since dx=1).
 
         Arugments
@@ -309,27 +310,27 @@ class ModelFreeDetect(object):
         -------
         max_abs_diff: float
             Maximum absolute difference between two arrays
-        '''
+        """
         meas_diff = np.diff(arr1)
         model_diff = np.diff(arr2)
         max_abs_diff = np.max(np.abs(meas_diff - model_diff))
         return max_abs_diff
 
     def by_time_of_day_transform(self):
-        '''Transform self.data time series (spanning several days) into a data frame
+        """Transform self.data time series (spanning several days) into a data frame
         with each row being time of a day and each column as a date.
 
         Returns
         -------
         by_time: pd.DataFrame
             DataFrame with time of day as rows and dates as columns.
-        '''
+        """
         tmp = pd.DataFrame(self.data, index=self.data.index)
         by_time = pd.pivot_table(tmp, index=tmp.index.time, columns=tmp.index.date, values='data')
         return by_time
 
     def generate_day_range(self, num_days=30):
-        '''Generates groups of days for statistical analysis.
+        """Generates groups of days for statistical analysis.
 
         Arguments
         ---------
@@ -340,7 +341,7 @@ class ModelFreeDetect(object):
         ------
         day_range: tuple
             (Day of interest, date of days (+/- window_size / 2))
-        '''
+        """
         if num_days > 31:
             warnings.warn('Using a large window of days may give suspect results.', RuntimeWarning)
         if num_days < 3:
@@ -363,7 +364,7 @@ class ModelFreeDetect(object):
                 yield days[i], day_range
 
     def calc_property(self, data, fxn, slices=None):
-        '''Calculate properties of windows.  The property value is set at the central
+        """Calculate properties of windows.  The property value is set at the central
         point of a window.
 
         The acceptable functions for calculating properties are:
@@ -386,7 +387,7 @@ class ModelFreeDetect(object):
         -------
         ser_vals: pd.Series
             Time series data of calculated property.
-        '''
+        """
         if fxn not in (self.calc_window_max, self.calc_window_line_length_norm,
                        self.calc_window_integral, self.calc_window_line_length,
                        self.calc_window_avg, self.calc_window_derivative_std_normed,
@@ -407,7 +408,7 @@ class ModelFreeDetect(object):
         return ser_vals
 
     def calc_spline(self, series, spline_window=None, kind=2):
-        '''Calculate smoothing spline for a given data set.
+        """Calculate smoothing spline for a given data set.
 
         Arguments
         ---------
@@ -423,7 +424,7 @@ class ModelFreeDetect(object):
         -------
         spline: pd.Series
             Smoothed data from series with same indices as series.
-        '''
+        """
         if spline_window is None:
             spline_window = self.window
         spline_list = []
@@ -443,7 +444,7 @@ class ModelFreeDetect(object):
         return spline
 
     def calc_window_line_length_norm_spline(self, series, slices=None, spline_window=None):
-        '''Calculate the normalized line length of windows.  Series window line lengths will be
+        """Calculate the normalized line length of windows.  Series window line lengths will be
         normalized by the line length of a smoothing spline over that time.
 
         Arguments
@@ -459,7 +460,7 @@ class ModelFreeDetect(object):
         -------
         ser_norm_line_length: pd.Series
             Time series of normalized line lenghts for each window.
-        '''
+        """
         if slices is None:
             slices = self.generate_window_slices(self.data)
 
@@ -477,7 +478,7 @@ class ModelFreeDetect(object):
 
     def generate_stat_cs(self, num_days=30, model_fxn=np.nanpercentile, percentile=90,
                          smooth_window=0, smooth_fxn=None):
-        '''Generate a clearsky curve using measured values and model_fxn.  Likely candidates
+        """Generate a clearsky curve using measured values and model_fxn.  Likely candidates
         for model_fxn would be np.nanmean, np.nanmedian, or np.nanpercentile.  The curve can also be smoothed
         using smooth_window and smooth_fxn.  Smoothing is done using pd.rolling on the series.
 
@@ -496,7 +497,7 @@ class ModelFreeDetect(object):
             Size (number of data points) for smoothing the statistical clear sky.
         smooth_fxn, optional: callable
             Function for smoothing the clear sky curve.
-        '''
+        """
         stat_cs_list = []
 
         by_time = self.by_time_of_day_transform()
@@ -515,7 +516,7 @@ class ModelFreeDetect(object):
         return stat_cs_ser
 
     def stat_cs_per_sample(self, day_to_filter, sample_days, model_fxn=np.nanpercentile, percentile=90):
-        '''Filter measurements by time of day based on deviation from fxn.
+        """Filter measurements by time of day based on deviation from fxn.
 
         Arguments
         ---------
@@ -527,7 +528,7 @@ class ModelFreeDetect(object):
             Function that will be used to construct the statistical clearsky curve.
         percentile, optional: float
             Percentile value for clearsky curve construction if percentile based function used.
-        '''
+        """
         # fixing indices is important - the by_time_of_day_transform will fill daylight savings/etc
         # which confuses indexing central vals
         correct_indices = self.data.loc[self._dates == day_to_filter].index
@@ -547,7 +548,7 @@ class ModelFreeDetect(object):
 
     def deviation_time_filter(self, num_days=30, model_fxn=np.nanmean,
                               mode='relative', percentile=90, dev_range=(.8, 1.2), verbose=False):
-        '''Filter measurements by time of day based on deviation a statistical clearsky curve.
+        """Filter measurements by time of day based on deviation a statistical clearsky curve.
 
         Note: it is generally a good idea to use numpy nan functions (i.e. np.nanmean, np.nanmedian,
         np.nanpercentile).  The 'normal' functions will raise errors if nan values are present in data.
@@ -568,7 +569,7 @@ class ModelFreeDetect(object):
         dev_range, optional: tuple(float, float)
             Range of allowed deviation.  First value is lower limit, second value is upper limit.
 
-        '''
+        """
         if mode in ('direct', 'relative'):
             stat_cs = self.generate_stat_cs(num_days=num_days, model_fxn=model_fxn, percentile=percentile)
             if mode == 'direct':
@@ -586,7 +587,7 @@ class ModelFreeDetect(object):
         self.filter_mask = mask
 
     def standard_detection(self, verbose=False, splines=False, spline_window=None, metric_tol=.01):
-        '''Determine clear sky periods based on irradiance measurements.  Central value of window
+        """Determine clear sky periods based on irradiance measurements.  Central value of window
         is labeled clear if window passes test.
 
         Arguments
@@ -606,7 +607,7 @@ class ModelFreeDetect(object):
             boolean time series of clear times
         components, optional: dict
             contains series of normalized lengths, local integrals, and calculated metric
-        '''
+        """
         is_clear = pd.Series(False, self.data.index)
 
         components = self.calc_components(splines=splines, spline_window=spline_window)
@@ -619,7 +620,7 @@ class ModelFreeDetect(object):
             return is_clear
 
     def calc_components(self, splines=False, spline_window=None, slices=None):
-        '''Calculate normalized distances and integrals of moving window.  Values
+        """Calculate normalized distances and integrals of moving window.  Values
         are reported at the central index of the window.
 
         Arguments
@@ -631,7 +632,7 @@ class ModelFreeDetect(object):
         -------
         result: pd.DataFrame
             Contains calculated properties for clearsky detection.
-        '''
+        """
         if slices is None:
             slices = self.generate_window_slices(self.data)
 
@@ -654,7 +655,7 @@ class ModelFreeDetect(object):
         return result
 
     def calc_cloudiness_metric(self, distances, integrals):
-        '''Calculate the cloudiness metric.
+        """Calculate the cloudiness metric.
 
         Cloudiness = log(distances) / log(integrals)
 
@@ -670,14 +671,14 @@ class ModelFreeDetect(object):
         metric: np.array
             Metric values.
 
-        '''
+        """
         # metric = np.log(distances) / np.log(integrals)
         # metric = np.log(distances) / np.log(integrals)
         metric = distances**2 / integrals
         return metric
 
     def mean_detection(self, verbose=False, splines=False, spline_window=None, metric_tol=.01):
-        '''Determine clear sky periods based on irradiance measurements.  Central value
+        """Determine clear sky periods based on irradiance measurements.  Central value
         of window is labeled clear if the average value of the window is at or below metric_tol.
         The cloudiness metric is smoothed by averaging the points +/- (self.window / 2).
 
@@ -698,7 +699,7 @@ class ModelFreeDetect(object):
             Boolean time series of clear times.
         components, optional: pd.DataFrame
             Contains series of normalized lengths, local integrals, and calculated metric.
-        '''
+        """
         is_clear = pd.Series(False, self.data.index)
 
         components = self.calc_components(splines=splines, spline_window=spline_window)
@@ -718,7 +719,9 @@ class ModelFreeDetect(object):
             return is_clear
 
     def democratic_detection(self, vote_pct=.75, splines=False, spline_window=None, verbose=False, metric_tol=.01):
-        '''Determine clear sky periods based on irradiance measurements.  Central value
+        """Determine clear sky periods based on irradiance measurements.
+
+        Central value
         of window is labeled clear if the average value of the window is at or below metric_tol.
         The clarity of a given point is determined by calculating the percent of windows it is in
         that are <= metric_tol.  Each point is in self.window windows (right-most point all the
@@ -741,7 +744,7 @@ class ModelFreeDetect(object):
             Boolean time series of clear times.
         components, optional: pd.DataFrame
             Contains series of normalized lengths, local integrals, and calculated metric.
-        '''
+        """
         is_clear = pd.Series(False, self.data.index)
 
         components = self.calc_components(splines=splines, spline_window=spline_window)
@@ -758,7 +761,6 @@ class ModelFreeDetect(object):
         else:
             return is_clear
 
+
 if __name__ == '__main__':
     main()
-
-

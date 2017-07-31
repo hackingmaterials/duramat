@@ -51,3 +51,6 @@ nosetests.xml
 # IPython notebook checkpoints
 .ipynb_checkpoints
 
+# png images in clearsky_detection work
+/clearsky_detection/*.png
+/clearsky_detection/*.pkl*
