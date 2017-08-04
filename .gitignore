@@ -53,4 +53,4 @@ nosetests.xml
 
 # png images in clearsky_detection work
 /clearsky_detection/*.png
-/clearsky_detection/*.pkl*
+# /clearsky_detection/*.pkl*

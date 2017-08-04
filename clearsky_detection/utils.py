@@ -374,15 +374,3 @@ def fit_model_cv_grid(clf, df, cols, param_grid):
 
 # def parse_kg_climate_class(lat, lon, filename='./Koeppen-Geiger-ASCII.txt'):
 #     kg_df = pd.read_csv(filename, delim_whitespace=True)
-
-
-
-
-
-
-
-
-
-
-
-
