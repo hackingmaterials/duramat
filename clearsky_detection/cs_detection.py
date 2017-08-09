@@ -4,6 +4,8 @@ import os
 
 import numpy as np
 import pandas as pd
+from scipy import optimize
+from scipy import stats
 from sklearn import model_selection
 from sklearn import metrics
 import pvlib
@@ -404,40 +406,38 @@ class ClearskyDetection(object):
         clear_skies.index = self.df.index
         self.df[label] = clear_skies
 
-    def calc_distance_to_solar_noon(self, model_col, label='time_to_solarnoon', overwrite=False):
-        """Get solar position based on indices and optionally calculate distance to solar noon for each part of the day.
-
-        There is probably a faster way to do this.
-
-        Arguments
-        ---------
-        model_col: str
-            Column of model GHI.
-        label, optional: str
-            Name of calculated time to solar noon.
-        overwrite, optional: bool
-            Overwrite label if it exists.
-        """
-        if label in self.df.keys() and not overwrite:
-            raise RuntimeError('Label already exists. Set overwrite to true or set label name.')
-        max_indices = []
-        for _, group in self.df[model_col].groupby(self.df[model_col].index.date):
-            max_indices.append(group.idxmax())
-        max_indices = pd.DataFrame(max_indices)
-        max_indices.index = max_indices.values
-        res_list = []
-        # for idx in max_indices.index:
-        #     res = self.df.iloc[self.df.index.get_loc(idx, method='nearest')]
-        #     res_list.append(res)
-        # return res_list
-        for idx in self.df.index:
-            res = max_indices.iloc[max_indices.index.get_loc(idx, method='nearest')]
-            res_list.append(res)
-        nearest_max = pd.DataFrame(res_list, columns=['nearest_max'])
-        self.df[label] = np.abs(self.df.index - nearest_max['nearest_max'].values).total_seconds() / 60
-        # return res_list
-
-
+    # def calc_distance_to_solar_noon(self, model_col, label='time_to_solarnoon', overwrite=False):
+    #     """Get solar position based on indices and optionally calculate distance to solar noon for each part of the day.
+    #
+    #     There is probably a faster way to do this.
+    #
+    #     Arguments
+    #     ---------
+    #     model_col: str
+    #         Column of model GHI.
+    #     label, optional: str
+    #         Name of calculated time to solar noon.
+    #     overwrite, optional: bool
+    #         Overwrite label if it exists.
+    #     """
+    #     if label in self.df.keys() and not overwrite:
+    #         raise RuntimeError('Label already exists. Set overwrite to true or set label name.')
+    #     max_indices = []
+    #     for _, group in self.df[model_col].groupby(self.df[model_col].index.date):
+    #         max_indices.append(group.idxmax())
+    #     max_indices = pd.DataFrame(max_indices)
+    #     max_indices.index = max_indices.values
+    #     res_list = []
+    #     # for idx in max_indices.index:
+    #     #     res = self.df.iloc[self.df.index.get_loc(idx, method='nearest')]
+    #     #     res_list.append(res)
+    #     # return res_list
+    #     for idx in self.df.index:
+    #         res = max_indices.iloc[max_indices.index.get_loc(idx, method='nearest')]
+    #         res_list.append(res)
+    #     nearest_max = pd.DataFrame(res_list, columns=['nearest_max'])
+    #     self.df[label] = np.abs(self.df.index - nearest_max['nearest_max'].values).total_seconds() / 60
+    #     # return res_lis
     #
     #
     # #     # dist_list = []
@@ -513,6 +513,36 @@ class ClearskyDetection(object):
         ratio = (self.df[col1] / self.df[col2]).replace([-np.inf, np.inf, np.nan], 1)
         self.df[label] = np.abs(1 - ratio)
 
+    def calc_line_length(self, col, window, dx, label=None, overwrite=False):
+        """Calculate the rolling line length of data series.
+
+        Arguments
+        ---------
+        col: str
+            Data column to calculate for.
+        window: int
+            Number of time periods to include in window.
+        dx: float
+            Delta of x values (time in this case).
+        label, optional: str
+            Name of resultant column.  If None, will add 'line length' to col.
+        overwrite, optional: bool
+            Overwrite label if it exists.
+        """
+        if label is None:
+            label = col + ' line length'
+        if label in self.df.keys() and not overwrite:
+            raise RuntimeError('Label already exists.  Set overwrite to True or pick new label name.')
+        #   dx = self.df.index.freq.nanos / 1.0e9 / 60.0e0
+        ser = self.df[col].rolling(window, center=True).apply(lambda x: self.line_length(x, dx)).fillna(0)
+        self.df[label] = ser
+
+    def line_length(self, x, dx):
+        ydiffs = np.diff(x)
+        xdiffs = np.asarray([dx for i in range(len(ydiffs))])
+        length = np.sum(np.sqrt((ydiffs**2) + (xdiffs**2)))
+        return length
+
     def calc_ratio(self, col1, col2, label='ratio', overwrite=False):
         """Ratio of two columns of dataframe.
 
@@ -581,6 +611,8 @@ class ClearskyDetection(object):
         """
         if (ratio_label in self.df.keys() or abs_ratio_diff_label in self.df.keys()) and not overwrite:
             raise RuntimeError('A label already exists.  Set overwrite to True or pick new label name.')
+        dx = self.df.index.freq.nanos / 1.0e9 / 60.0e0
+
         self.calc_ratio(col1, col2, ratio_label, overwrite=overwrite)
         self.calc_abs_ratio_diff(col1, col2, abs_ratio_diff_label, overwrite=overwrite)
 
@@ -605,6 +637,12 @@ class ClearskyDetection(object):
         label = abs_ratio_diff_label + ' gradient'
         self.df[label] = np.abs(np.gradient(self.df[abs_ratio_diff_label], dx))
         self.calc_window_stat(window, label, label, overwrite=overwrite)
+
+        label_ll_1 = col1 + ' line length'
+        self.calc_line_length(col1, window, dx, label=label_ll_1, overwrite=overwrite)
+        label_ll_2 = col2 + ' line length'
+        self.calc_line_length(col2, window, dx, label=label_ll_2, overwrite=overwrite)
+        self.calc_abs_ratio_diff(label_ll_1, label_ll_2, 'abs_ratio_diff line length', overwrite=overwrite)
 
     def fit_model(self, feature_cols, target_cols, clf,
                   conf_matrix=True, cv=True):
@@ -636,3 +674,76 @@ class ClearskyDetection(object):
         score = metrics.accuracy_score(y_test, y_pred)
         print('Train/test split score: {}'.format(score))
         return clf
+
+    def scale_model(self, meas_col, model_col, status_col):
+        clear_meas = self.df[self.df[status_col]][meas_col]
+        clear_model = self.df[self.df[status_col]][model_col]
+        alpha = 1
+        def rmse(alpha):
+            return np.sqrt(np.mean((clear_meas - alpha*clear_model)**2))
+        alpha = optimize.minimize_scalar(rmse).x
+        self.df[model_col] = alpha * self.df[model_col]
+
+    def iter_predict(self, feature_cols, meas_col, model_col, clf, window, n_iter=20, tol=1.0e-8, ml_label='sky_status iter', smooth=False, overwrite=True):
+        """Predict clarity based using classifier that iteratively fits the model column
+        to the measured column based on clear points.
+
+        This function WILL overwrite columns that already exist in the data frame.
+
+        Arguments
+        ---------
+        feature_cols: list-like
+            Column names to use as features in ML model.
+        clf: sklearn estimator
+            Object with fit and predict methods.
+        meas_col: str
+            Column of measured data.
+        model_col: str
+            Column of model data.
+        n_iter, optional: int
+            Number of iterations for fitting model to measured column.
+        tol, optoinal: float
+            Criterion for convergence of modeled and measured clear points.
+        ml_label, optional: str
+            Label for predicted clear/cloudy points.
+        smooth, optional: bool
+            Smooth results.  Smoothing is aggressive as a point must be clear
+            in every window it appears in.
+        overwrite, optional: bool
+            Permission to overwrite columns if they exist.
+        """
+        alpha = 1
+        for it in range(n_iter):
+            # print(it + 1, alpha)
+            self.calc_all_window_metrics(window, None, col1=meas_col, col2=model_col,
+                                         ratio_label='ratio', abs_ratio_diff_label='abs_diff_ratio', overwrite=overwrite)
+            X = self.df[feature_cols].values
+            y_pred = clf.predict(X)
+            clear_meas = self.df[y_pred][meas_col]
+            clear_model = self.df[y_pred][model_col]
+            alpha_last = alpha
+            def rmse(alpha):
+                return np.sqrt(np.mean((clear_meas - alpha*clear_model)**2))
+            min_scalar = optimize.minimize_scalar(rmse)
+            alpha = min_scalar.x
+            if np.abs(alpha - alpha_last) < tol:
+                break
+            self.df[model_col] = self.df[model_col] * alpha
+        if it == n_iter - 1:
+            warnings.warn('Scaling did not converge.', RuntimeWarning)
+        self.df[ml_label] = y_pred
+        if smooth:
+            self.smooth_ml_label(window * 2, ml_label)
+        return self.df[ml_label]
+
+    def smooth_ml_label(self, window, label):
+        """Smooth labeled points.
+
+        Labeled points are smooth by assuring that each point in a window is labeled as clear.
+        This is only appropriate for binary data.
+        """
+        ser = self.df[label].rolling(window, center=True).apply(lambda x: np.sum(x) == len(x)).fillna(0)
+        self.df[label] = ser
+
+    # def window_mode(self, x):
+    #     return np.sum(x) == len(x)
