@@ -13,6 +13,7 @@ from plotly import figure_factory as ff
 
 import matplotlib
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 class Visualizer(object):
 
@@ -36,7 +37,7 @@ class Visualizer(object):
         self.data.append(go.Scatter(x=x, y=y, name=label))
 
     def add_circle(self, x, y, label):
-        self.data.append(go.Scatter(x=x, y=y, name=label, mode='markers', marker={'size': 10}))
+        self.data.append(go.Scatter(x=x, y=y, name=label, mode='markers', marker={'size': 8}))
 
     def show(self):
         fig ={'data': self.data, 'layout': self.layout}
@@ -67,13 +68,33 @@ class Visualizer(object):
         fig.layout.update({'width': 500})
         fig.layout.xaxis.update({'title': 'predicted label'})
         fig.layout.yaxis.update({'title': 'true label'})
-        # fig.layout.xaxis.update({'tickmode': 'array'})
-        # fig.layout.yaxis.update({'tickmode': 'array'})
-        # fig.layout.xaxis.update({'tickvals': [i + .5 for i in range(len(mat))]})
-        # fig.layout.yaxis.update({'tickvals': [i + .5 for i in range(len(mat))]})
-        # fig.layout.xaxis.update({'ticktext': labels})
-        # fig.layout.yaxis.update({'ticktext': labels})
         iplot(fig)
+
+    def plot_corr_matrix(self, mat, labels):
+        # fig = ff.create_annotated_heatmap(mat, x=labels, y=labels, colorscale='Blues', showscale=True)
+        # fig.layout.update({'width': 500})
+        # plot(fig)
+        mask = np.zeros_like(mat, dtype=np.bool)
+        mask[np.triu_indices_from(mask)] = True
+
+        # Set up the matplotlib figure
+        f, ax = plt.subplots(figsize=(11, 9))
+
+        # Generate a custom diverging colormap
+        cmap = sns.diverging_palette(220, 10, as_cmap=True)
+
+        # Draw the heatmap with the mask and correct aspect ratio
+        sns.heatmap(mat, mask=mask, cmap=cmap, vmax=.3, center=0,
+                    square=True, linewidths=.5, cbar_kws={"shrink": .5}, xticklabels=labels, yticklabels=labels)
+        plt.yticks(rotation=0, fontsize=6)
+        plt.xticks(rotation=90, fontsize=6)
+        plt.show()
+
+    def add_bar(self, x, y):
+        self.data.append(go.Bar(x=x, y=y))
+
+    def add_bar_ser(self, ser):
+        self.add_bar(ser.index, ser.values)
 
     def plot_confusion_matrix2(self, cm, classes,
                               normalize=True,
