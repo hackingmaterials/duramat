@@ -1,15 +1,16 @@
 
+import copy
 import warnings
 import os
 import concurrent.futures as cf
-import multiprocessing as mp
 
 import numpy as np
-from scipy import linalg
 from scipy import optimize
 import pandas as pd
 import pvlib
 import utils
+from sklearn.preprocessing import MinMaxScaler
+
 
 class ClearskyDetection(object):
     """Class for detecting clearsky based on NSRDB data."""
@@ -17,33 +18,32 @@ class ClearskyDetection(object):
     def __init__(self, df, copy=True):
         """Initialize members.
 
-        Arguments
+        Parameters
         ---------
-        nsrdb_df: pd.DataFrame
-            NSRDB data.
-        ground_df: pd.DataFrame
-            Ground based data.
+        df: pd.DataFrame
+            Time series irradiance data.
         """
         if copy:
             self.df = df.copy()
         else:
             self.df = df
+        self.df['ghi_status'] = self.df['GHI'] > 0
 
     @classmethod
-    def read_nsrdb_dir(cls, dir_path, timezone, keepers=['GHI', 'Clearsky GHI', 'Cloud Type'], file_ext='csv'):
+    def read_nsrdb_dir(cls, dir_path, timezone, keepers=('GHI', 'Clearsky GHI', 'Cloud Type'), file_ext='csv'):
         """Read directory of NSRDB files.
 
         *** NOTE ***
         This is hardcoded for the files I have.  It is not guaranteed to be general at all for
         SRRL/MDIC/etc data sources and files.
 
-        Arguments
+        Parameters
         ---------
         dir_path: str
             Path to directory of files.
         timezone: pytz.timezone
             Timezone for the dataframe indicies.
-        file_ext, optional: str
+        file_ext: str
             Filetype to specify for reading.
 
         Returns
@@ -65,8 +65,6 @@ class ClearskyDetection(object):
                 pass
         df = df[df.index.isin(tmp_list)]
         df.index = df.index.tz_localize(timezone)
-        # df.index = df.index.tz_localize('UTC')
-        # df.index = df.index.tz_convert(timezone)
         df = df.sort_index()
         df = df.reindex(pd.date_range(start=df.index[0], end=df.index[-1], freq='30min')).fillna(0)
         df = df[~df.index.duplicated(keep='first')]
@@ -74,22 +72,19 @@ class ClearskyDetection(object):
         return cls(df[keepers])
 
     @classmethod
-    def read_snl_rtc(cls, file_w_path, timezone, keepers=['GHI']):
-    # def read_snl_rtc(cls, file_w_path, timezone1, timezone2, keepers=['GHI']):
+    def read_snl_rtc(cls, file_w_path, timezone, keepers=('GHI')):
         """Read SNL RTC data into file.
 
         *** NOTE ***
         This is hardcoded for the files I have.  It is not guaranteed to be general at all for
         SRRL/MDIC/etc data sources and files.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         file_w_path: str
             Path to file (absolute).
-        timezone1: pytz.timezone or str
+        timezone: pytz.timezone or str
             Timezone for localization.
-        timezone2: pytz.timezone or str
-            Timezone to which indices will be converted.
 
         Returns
         -------
@@ -114,21 +109,21 @@ class ClearskyDetection(object):
         return cls(df[keepers])
 
     @classmethod
-    def read_srrl_dir(cls, dir_path, timezone, file_ext='txt', keepers=['GHI']):
+    def read_srrl_dir(cls, dir_path, timezone='MST', keepers=('GHI')):
         """Read directory of SRRL files into a dataframe.
 
         *** NOTE ***
         This is hardcoded for the files I have.  It is not guaranteed to be general at all for
         SRRL/MDIC/etc data sources and files.
 
-        Arguments
+        Parameters
         ---------
         dir_path: str
             Path to directory of files.
         timezone: pytz.timezone
             Timezone for the dataframe indicies.
-        file_ext, optional: str
-            Filetype to specify for reading.
+        keepers: list-like
+            Columns to keep in dataframe.
 
         Returns
         -------
@@ -159,7 +154,27 @@ class ClearskyDetection(object):
         return cls(df[keepers])
 
     @classmethod
-    def read_ornl_file(cls, filename, timezone='EST', keepers = ['GHI']):
+    def read_ornl_file(cls, filename, timezone='EST', keepers = ('GHI')):
+        """Read directory of SRRL files into a dataframe.
+
+        *** NOTE ***
+        This is hardcoded for the files I have.  It is not guaranteed to be general at all for
+        SRRL/MDIC/etc data sources and files.
+
+        Parameters
+        ---------
+        filename: str
+            Path to directory of files.
+        timezone: pytz.timezone
+            Timezone for the dataframe indicies.
+        keepers: list-like
+            Columns to keep in dataframe.
+
+        Returns
+        -------
+        df: pd.DataFrame
+            Contains all fields from files.
+        """
         df = pd.read_csv(filename)
         df.index = pd.to_datetime(df['DATE (MM/DD/YYYY)'] + ' ' + df['EST'], format='%m/%d/%Y %H:%M')
         tmp_list = []
@@ -178,10 +193,10 @@ class ClearskyDetection(object):
         return cls(df[keepers])
 
     @classmethod
-    def read_pickle(cls, filename, compression=None):
+    def read_pickle(cls, filename):
         """Read dataframe from pickle file.
 
-        Arguments
+        Parameters
         ---------
         filename: str
             Name of pickle file.
@@ -189,14 +204,14 @@ class ClearskyDetection(object):
         df = pd.read_pickle(filename)
         return cls(df)
 
-    def to_pickle(self, filename, overwrite=False, compression=None):
+    def to_pickle(self, filename, overwrite=False):
         """Dump dataframe to pickle file.
 
-        Arguments
+        Parameters
         ---------
         filename: str
             Name of pickle file.
-        overwrite, optional: bool
+        overwrite: bool
             Overwrite file if it exists.
         """
         if os.path.exists(filename) and not overwrite:
@@ -206,15 +221,15 @@ class ClearskyDetection(object):
     def robust_rolling_smooth(self, col, window, label=None, overwrite=False):
         """Smooth column of data robustly (median + mean).
 
-        Arguments
+        Parameters
         ---------
         col: str
             Column in dataframe.
         window: int
             Number of points to include in window.
-        label, optional: str
+        label: str
             Name of smoothed column.
-        overwrite, optional: bool
+        overwrite: bool
             Overwrite new column or not.
         """
         if label is None:
@@ -229,11 +244,11 @@ class ClearskyDetection(object):
 
         The x0 is inclusive, x1 is exclusive.  If either are None, assume no trimming in said direction.
 
-        Arguments
+        Parameters
         ---------
-        x0, optional: datetime or str
+        x0: datetime or str
             Earlier date (inclusive).
-        x1, optional: datetime or str
+        x1: datetime or str
             Later date (exclusive).
         """
         if x0 is not None:
@@ -244,7 +259,7 @@ class ClearskyDetection(object):
     def intersection(self, other_indices):
         """Modify indices such that dataframe intersects with different set of indices.
 
-        Arguments
+        Parameters
         ---------
         other_indices: pd.DateTimeIndex
             Indices to intersect with.
@@ -257,9 +272,9 @@ class ClearskyDetection(object):
 
         The dataframe will be organized as Date (columnss) X Timestample (rows).
 
-        Arguments
+        Parameters
         ---------
-        data, optional: str
+        data: str
             Which data column (nsrdb/ground).  Assumed to be 'GHI'.
 
         Returns
@@ -276,20 +291,24 @@ class ClearskyDetection(object):
                                       label='Clearsky GHI stat', overwrite=False):
         """Generate statistical clearsky for either dataset.
 
-        Arguments
+        Parameters
         ---------
-        data, optional: str
+        data: str
             Data column to generate clearsky, assumed to be 'GHI'.
-        num_days, optional: int
+        num_days: int
             Size of window (in days) for constructing clearsky curve.
-        model_fxn, optional: callable
+        model_fxn: callable
             Function for determining clearsky curve.
-        percentile, optional: float
+        percentile: float
             Perctile value used in statistical clearsky, ignored if model_fxn is not np.percentile or np.nanpercentile.
-        smooth_window, optional: int
+        smooth_window: int
             Size (number of data points) for smoothing the statistical clear sky.
-        smooth_fxn, optional: callable
+        smooth_fxn: callable
             Function for smoothing the clear sky curve.
+        label: str
+            Name of statistical clearsky column for dataframe.
+        overwrite: bool
+            Permission to overwrite existing columns.
         """
         if label in self.df.keys() and not overwrite:
             raise RuntimeError('Label already exists.  Set overwrite to True or pick new label name.')
@@ -316,7 +335,7 @@ class ClearskyDetection(object):
                            model_fxn=np.nanpercentile, percentile=90):
         """Filter measurements by time of day based on deviation from fxn.
 
-        Arguments
+        Parameters
         ---------
         dates: list-like
             Unique dates in data.
@@ -324,9 +343,9 @@ class ClearskyDetection(object):
             Day which will be filtered.
         sample_days: pd.DataFrame
             DataFrame of measured values (rows are time of day and columns are dates).
-        model_fxn, optional: callable
+        model_fxn: callable
             Function that will be used to construct the statistical clearsky curve.
-        percentile, optional: float
+        percentile: float
             Percentile value for clearsky curve construction if percentile based function used.
         """
         # fixing indices is important - the by_time_of_day_transform will fill daylight savings/etc
@@ -349,12 +368,12 @@ class ClearskyDetection(object):
     def generate_day_range(self, dates, num_days=30):
         """Generates groups of days for statistical analysis.
 
-        Arguments
-        ---------
-        window_size, optional: int
-            Size of window (in days).
+        Parameters
+        ----------
         dates: list-like
             Unique dates in data.
+        num_days: int
+            Size of window in days.
 
         Yields
         ------
@@ -385,13 +404,13 @@ class ClearskyDetection(object):
     def generate_pvlib_clearsky(self, latitude, longitude, altitude=None, label='Clearsky GHI pvlib', overwrite=False):
         """Generate pvlib clearsky curve.
 
-        Arguments
-        ---------
-        lat: float
+        Parameters
+        ----------
+        latitude: float
             Latitutde.
-        lon: float
+        longitude: float
             Longitude.
-        elevation, optional: float
+        altitude: float
             Elevation of system (this is not required by Location object).
         label: str
             Label of clearsky data points.
@@ -410,19 +429,19 @@ class ClearskyDetection(object):
                               modeled='Clearsky GHI pvlib', label='sky_status pvlib', window=10, overwrite=False):
         """Detect clearsky using PVLib methods.
 
-        Arguments
-        ---------
-        scale, optional: bool
+        Parameters
+        ----------
+        scale: bool
             Scale modeled column by factor determined by PVLib.
-        measured, optional: str
+        measured: str
             Column to detect.
-        modeled, optional: str
+        modeled: str
             Column of modeled clearsky (reference for measured).
-        result, optional: str
-            Column name of results.
-        window, optional: int
+        label: str
+            Classification label name.
+        window: int
             Size of window for PVLib detection.
-        overwrite, optional: bool
+        overwrite: bool
             Allow column to be overwritten if label exists.
         """
         if label in self.df.keys() and not overwrite:
@@ -441,11 +460,11 @@ class ClearskyDetection(object):
     def set_nsrdb_sky_status(self, label='sky_status', overwrite=False):
         """Set sky status target for machine learning applications for nsrdb data.
 
-        Arguments
-        ---------
-        label, optional: str
+        Parameters
+        ----------
+        label: str
             Column name for new sky status.
-        overwrite, optional: bool
+        overwrite: bool
             Allow column to be overwritten in column exists
         """
         if label in self.df.keys() and not overwrite:
@@ -455,8 +474,8 @@ class ClearskyDetection(object):
     def scale_model(self, meas_col, model_col, status_col=None):
         """Scale model values to measured values based on clear sky periods.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         meas_col: str
             Column of measured GHI values.
         model_col: str
@@ -470,192 +489,69 @@ class ClearskyDetection(object):
         else:
             clear_meas = self.df[meas_col]
             clear_model = self.df[model_col]
-        alpha = 1
+
         def rmse(alpha):
             sqr_err = (clear_meas - (alpha * clear_model))**2
             return np.sqrt(np.mean(sqr_err))
-        alpha = optimize.minimize_scalar(rmse).x
-        self.df[model_col] = alpha * self.df[model_col]
 
-    # def iter_predict(self, feature_cols, meas_col, model_col, clf, window, n_iter=20, tol=1.0e-8, ml_label='sky_status iter', smooth=False, overwrite=True):
-    #     """Predict clarity based using classifier that iteratively fits the model column
-    #     to the measured column based on clear points.
-    #
-    #     This function WILL overwrite columns that already exist in the data frame.
-    #
-    #     Arguments
-    #     ---------
-    #     feature_cols: list-like
-    #         Column names to use as features in ML model.
-    #     clf: sklearn estimator
-    #         Object with fit and predict methods.
-    #     meas_col: str
-    #         Column of measured data.
-    #     model_col: str
-    #         Column of model data.
-    #     n_iter, optional: int
-    #         Number of iterations for fitting model to measured column.
-    #     tol, optoinal: float
-    #         Criterion for convergence of modeled and measured clear points.
-    #     ml_label, optional: str
-    #         Label for predicted clear/cloudy points.
-    #     smooth, optional: bool
-    #         Smooth results.  Smoothing is aggressive as a point must be clear
-    #         in every window it appears in.
-    #     overwrite, optional: bool
-    #         Permission to overwrite columns if they exist.
-    #     """
-    #     alpha = 1
-    #     for it in range(n_iter):
-    #         print(it + 1, alpha)
-    #         self.calc_all_window_metrics(window, col1=meas_col, col2=model_col,
-    #                                      ratio_label='ratio', abs_ratio_diff_label='abs_diff_ratio', overwrite=overwrite)
-    #         X = self.df[feature_cols].values
-    #         y_pred = clf.predict(X)
-    #         clear_meas = self.df[y_pred][meas_col]
-    #         clear_model = self.df[y_pred][model_col]
-    #         alpha_last = alpha
-    #         def rmse(alpha):
-    #             return np.sqrt(np.mean((clear_meas - (alpha * clear_model))**2))
-    #         min_scalar = optimize.minimize_scalar(rmse)
-    #         alpha = min_scalar.x
-    #         if np.abs(alpha - alpha_last) < tol:
-    #             break
-    #         self.df[model_col] = self.df[model_col] * alpha
-    #     if it == n_iter - 1:
-    #         warnings.warn('Scaling did not converge.', RuntimeWarning)
-    #     self.df[ml_label] = y_pred
-    #     if smooth:
-    #         self.smooth_ml_label(window * 2, ml_label)
-    #     return self.df[ml_label]
-
-    # def iter_predict_daily(self, feature_cols, meas_col, model_col, clf, window, n_iter=20,
-    #                              tol=1.0e-8, ml_label='sky_status iter', smooth=False, overwrite=True):
-    #     """Predict clarity based using classifier that iteratively fits the model column
-    #     to the measured column based on clear points.
-    #
-    #     This method differs from iter_predict method because it predicts/scales on individual days, not the entire data set.
-    #     This function WILL overwrite columns that already exist in the data frame.
-    #
-    #     Method should be refactored.  Calculating features and scaling model GHI is done across entire data set even though we only need one day at a time.
-    #
-    #     Arguments
-    #     ---------
-    #     feature_cols: list-like
-    #         Column names to use as features in ML model.
-    #     clf: sklearn estimator
-    #         Object with fit and predict methods.
-    #     meas_col: str
-    #         Column of measured data.
-    #     model_col: str
-    #         Column of model data.
-    #     n_iter, optional: int
-    #         Number of iterations for fitting model to measured column.
-    #     tol, optoinal: float
-    #         Criterion for convergence of modeled and measured clear points.
-    #     ml_label, optional: str
-    #         Label for predicted clear/cloudy points.
-    #     smooth, optional: bool
-    #         Smooth results.  Smoothing is aggressive as a point must be clear
-    #         in every window it appears in.
-    #     overwrite, optional: bool
-    #         Permission to overwrite columns if they exist.
-    #     """
-    #     # dx = self.df.index.freq.nanos / 1.0e9 / 60.0e0
-    #     day_dfs = []
-    #     groups = self.df.groupby(self.df[[meas_col, model_col]].index.date)
-    #     my_list = [day.copy() for (name, day) in groups]
-    #     # for name, day in self.df.groupby(self.df[[meas_col, model_col]].index.date):
-    #     for day in my_list:
-    #         alpha = 1
-    #         converged = False
-    #         for _ in range(n_iter):
-    #             utils.calc_all_window_metrics(day, window, meas_col=meas_col, model_col=model_col, overwrite=overwrite)
-    #             X = day[feature_cols].values
-    #             y_pred = clf.predict(X)
-    #             clear_meas = day[y_pred][meas_col]
-    #             clear_model = day[y_pred][model_col]
-    #             alpha_last = alpha
-    #             def rmse(alpha):
-    #                 sqr_err = (clear_meas - (alpha * clear_model))**2
-    #                 return np.sqrt(np.mean(sqr_err))
-    #             min_scalar = optimize.minimize_scalar(rmse)
-    #             alpha = min_scalar.x
-    #             day.loc[:, ml_label] = y_pred
-    #             if alpha > 1.25 or alpha < .75:
-    #                 warnings.warn('Large scaling value.  Day will not be further assessed or scaled.', RuntimeWarning)
-    #                 break
-    #             day.loc[:, model_col] = day[model_col] * alpha
-    #             if np.abs(alpha - alpha_last) < tol:
-    #                 converged = True
-    #                 break
-    #         if not converged:
-    #             warnings.warn('Scaling did not converge.', RuntimeWarning)
-    #         day_dfs.append(day)
-    #     indices = self.df.index
-    #     self.df = pd.concat(day_dfs)
-    #     self.df.index = indices
-    #     return self.df[ml_label]
+        alp = optimize.minimize_scalar(rmse).x
+        self.df[model_col] = alp * self.df[model_col]
 
     def iter_predict_daily(self, feature_cols, meas_col, model_col, clf, window, n_iter=20,
-                           tol=1.0e-8, ml_label='sky_status iter', smooth=False, overwrite=True, multiproc=True):
+                           tol=1.0e-8, ml_label='sky_status iter', overwrite=True, multiproc=False, by_day=False):
         """Predict clarity based using classifier that iteratively fits the model column
         to the measured column based on clear points.
 
-        This method differs from iter_predict method because it predicts/scales on individual days, not the entire data set.
-        This function WILL overwrite columns that already exist in the data frame.
+        This method differs from iter_predict method because it predicts/scales on individual days,
+        not the entire data set.  This function WILL overwrite columns that already exist in the data frame.
 
-        Method should be refactored.  Calculating features and scaling model GHI is done across entire data set even though we only need one day at a time.
-
-        Arguments
-        ---------
+        Parameters
+        ----------
         feature_cols: list-like
             Column names to use as features in ML model.
-        clf: sklearn estimator
-            Object with fit and predict methods.
         meas_col: str
             Column of measured data.
         model_col: str
             Column of model data.
-        n_iter, optional: int
+        clf: sklearn estimator
+            Object with fit and predict methods.
+        window: int
+            Number of nearby points to include in window-based calculations.
+        n_iter: int
             Number of iterations for fitting model to measured column.
-        tol, optoinal: float
+        tol: float
             Criterion for convergence of modeled and measured clear points.
-        ml_label, optional: str
+        ml_label: str
             Label for predicted clear/cloudy points.
-        smooth, optional: bool
-            Smooth results.  Smoothing is aggressive as a point must be clear
-            in every window it appears in.
-        overwrite, optional: bool
+        overwrite: bool
             Permission to overwrite columns if they exist.
+        multiproc: bool
+            Use multiprocessing (only works if by_day is also True).
+        by_day: bool
+            Group data set by day and make predictions on single days (as opposed to entire data set at once).
         """
-        # day_dfs = []
         final_dfs = []
-        groups = self.df.groupby(self.df[[meas_col, model_col]].index.date)
-        my_list = [day.copy() for (name, day) in groups]
+        if by_day:
+            groups = self.df.groupby(self.df.index.date)
+            my_list = [day.copy() for (name, day) in groups]
+        else:
+            my_list = [self.df]
         if multiproc:
-            # pool = mp.Pool(processes=4)
-            # day_dfs = [pool.apply_async(utils.day_prediction, args=(day, clf, feature_cols, window, meas_col, model_col),
-            #                                               kwds={'overwrite': overwrite, 'n_iter': n_iter, 'tol': tol, 'ml_label': ml_label}) for day in my_list]
-            # final_dfs = [d.get() for d in day_dfs]
-            # pool.close()
-            # pool.join()
-            # procs = [mp.Process(target=utils.day_prediction, args=(day, clf, feature_cols, window, meas_col, model_col),
-            #                                                  kwargs={'overwrite'=overwrite, 'n_iter'=n_iter, 'tol'=tol, 'ml_label'=ml_label}) for day in my_list]
-
-            # with warnings.catch_warnings():
-            #     warnings.simplefilter('ignore')
             with cf.ProcessPoolExecutor() as executor:
                 day_dfs = [executor.submit(utils.day_prediction, day, clf, feature_cols,
-                                           window, meas_col, model_col, overwrite=overwrite, n_iter=n_iter, tol=tol, ml_label=ml_label) for day in my_list]
+                                           window, meas_col, model_col, overwrite=overwrite, n_iter=n_iter,
+                                           tol=tol, ml_label=ml_label)
+                           for day in my_list]
                 for future in cf.as_completed(day_dfs):
                     final_dfs.append(future.result())
         else:
             final_dfs = [utils.day_prediction(day, clf, feature_cols, window, meas_col, model_col,
                          overwrite=overwrite, n_iter=n_iter, tol=tol, ml_label=ml_label) for day in my_list]
-        indices = self.df.index
-        self.df = pd.concat(final_dfs)
-        self.df.index = indices
+        if multiproc:
+            self.df = pd.concat(final_dfs).sort_index()
+        else:
+            self.df = pd.concat(final_dfs)
+        self.df.index = pd.to_datetime(self.df.index)
         return self.df[ml_label]
 
     def smooth_ml_label(self, window, label):
@@ -667,12 +563,12 @@ class ClearskyDetection(object):
         ser = self.df[label].rolling(window, center=True).apply(lambda x: np.sum(x) == len(x)).fillna(0)
         self.df[label] = ser
 
-    def time_from_solar_noon(self, col, label):
+    def time_from_solar_noon(self, col, label='tfn'):
         """Calculate distance from solar noon (absolute) in minutes.
 
         Solar noon is defined as the index of the peak of the self.df[col] data.
 
-        Arguments
+        Parameters
         ---------
         col: str
             Column to be used for solar noon peak finding.
@@ -683,5 +579,35 @@ class ClearskyDetection(object):
         for name, day in self.df.groupby(self.df.index.date):
             maxidx = day[col].idxmax()
             mins.append(np.asarray((day.index - maxidx).total_seconds()) / 60.0e0)
-        mins = np.asarray(mins)
-        self.df[label] = mins.flatten()
+        mins = np.asarray(mins).flatten()
+        self.df[label] = np.abs(mins)
+        # self.df[label] = np.abs(mins)
+
+    def time_from_solar_noon_ratio(self, col, label='tfn_ratio', tfn_label='tfn'):
+        mins = []
+        for name, day in self.df.groupby(self.df.index.date):
+            maxidx = day[col].idxmax()
+            noon_min = (maxidx.hour * 60) + maxidx.minute
+            mins.append(day[tfn_label] / noon_min)
+        # self.df[label] = np.abs(np.array(mins).flatten())
+        self.df[label] = np.array(mins).flatten()
+
+    def time_from_solar_noon_ratio2(self, col, label='tfn_ratio'):
+        mins = []
+        for name, day in self.df.groupby(self.df.index.date):
+            maxidx = day[col].idxmax()
+            noon_min = (maxidx.hour * 60) + maxidx.minute
+            times = day.index.minute + day.index.hour * 60
+            mins.append(times / noon_min)
+        mins = np.array(mins).flatten()
+        mins[mins > 1] = 2 - mins[mins > 1]
+        # self.df[self.df[label] > 1] = 2 - self.df[self.df[label] > 1]  # np.ceil(self.df[label]) - self.df[label]
+        self.df[label] = mins
+
+    def scale_by_irrad(self, col, label='irrad_scaler'):
+        mmscaler = MinMaxScaler()
+        scaled_days = []
+        for name, day in self.df.groupby(self.df.index.date):
+            scaled_days.append(mmscaler.fit_transform(day[col].values.reshape(-1, 1)))
+        self.df[label] = np.array(scaled_days).flatten()
+        # self.df[label] = 1

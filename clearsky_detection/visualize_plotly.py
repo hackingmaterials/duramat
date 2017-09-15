@@ -123,3 +123,58 @@ class Visualizer(object):
         ax.set_xlabel('Predicted label')
         fig.tight_layout()
         return ax
+
+
+def plot_ts_slider_highligther(df, meas='GHI', model='Clearsky GHI pvlib', prob='prob', slider_lo=0.0, slider_hi=1, slider_num=21):
+    trace_model = go.Scatter(x=df.index, y=df[model], name=model)
+    trace_meas = go.Scatter(x=df.index, y=df[meas], name=meas)
+    marker_dict = {'color': df[prob], 'colorscale': 'Jet', 'showscale': True, 'size': 8}
+    trace_prob = go.Scatter(x=df.index, y=df[meas], mode='markers', marker=marker_dict,
+                            text='P_cloudy = ' + np.round(df[prob], 4).astype(str))
+    data = [trace_meas, trace_model, trace_prob]
+
+    for i in np.linspace(slider_lo, slider_hi, num=slider_num):
+        trace = go.Scatter(x=df[df[prob] <= i].index, y=df[df[prob] <= i][meas], hoverinfo='none', # name='P_cloudy cutoff ' + str(i),
+                           mode='markers', marker={'size': 12, 'symbol': 'circle-open', 'color': 'black'})
+        data.append(trace)
+
+    sliders = dict(
+        # GENERAL
+        steps = [],
+        # currentvalue = dict(font=dict(size = 16), xanchor="left")),
+
+        # PLACEMENT
+        # x = 0.15,
+        # y = -100,
+        # len = 0.85,
+        # pad = dict(t = 1, b = 0),
+        # yanchor = "bottom",
+        # xanchor = "left",
+    )
+
+    for ii, i in enumerate(np.linspace(slider_lo, slider_hi, num=slider_num)):
+        step = dict(
+            method = "restyle",
+            label = str(i),
+            value = str(i),
+            args = ["visible", [False] * (slider_num + 3)], # Sets all to false
+        )
+
+        step['args'][1][0] = True # Main trace
+        step['args'][1][1] = True # Main trace
+        step['args'][1][2] = True # Main trace
+        step['args'][1][3 + ii] = True # Selected trace through slider
+        sliders['steps'].append(step)
+
+    layout = dict(
+        # title = chart_filename,
+        showlegend = False,
+        autosize = True,
+        font = dict(size = 12),
+        # margin = dict(t = 80, l = 50, b = 50, r = 50, pad = 5),
+        # showlegend = True,
+        sliders = [sliders]
+    )
+
+    figure = dict(data=data, layout=layout)
+    iplot(figure)
