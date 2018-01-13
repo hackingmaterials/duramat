@@ -23,15 +23,16 @@ map = Basemap(llcrnrlon=-119, llcrnrlat=22, urcrnrlon=-64,
                                urcrnrlat=49, projection='lcc', lat_1=33, lat_2=45,
                                lon_0=-95, resolution='i', area_thresh=10000)
 
-# map.drawcoastlines()
-# map.drawcountries()
-# map.drawstates()
+map.drawcoastlines()
+map.drawcountries()
+map.drawstates()
 # map.fillcontinents(color = 'coral')
-# map.drawmapboundary()
+map.drawmapboundary()
 
 for lon, lat in zip(geological_info['longitude'], geological_info['latitude']):
     x, y = map(lon, lat)
-    map.scatter(x, y)
+    map.scatter(x, y, marker='x')
+    # map.scatter(x, y, s=20)
 
 map.readshapefile(os.path.expanduser('~/Downloads/cb_2016_us_nation_5m/cb_2016_us_nation_5m'), 'us_borders', drawbounds=True)
 

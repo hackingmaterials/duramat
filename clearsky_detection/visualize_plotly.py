@@ -78,16 +78,16 @@ class Visualizer(object):
         mask[np.triu_indices_from(mask)] = True
 
         # Set up the matplotlib figure
-        f, ax = plt.subplots(figsize=(11, 9))
+        f, ax = plt.subplots(figsize=(20, 10))
 
         # Generate a custom diverging colormap
         cmap = sns.diverging_palette(220, 10, as_cmap=True)
 
         # Draw the heatmap with the mask and correct aspect ratio
-        sns.heatmap(mat, mask=mask, cmap=cmap, vmax=.3, center=0,
+        sns.heatmap(mat, mask=mask, cmap=cmap, vmax=.3, center=0, annot=True,
                     square=True, linewidths=.5, cbar_kws={"shrink": .5}, xticklabels=labels, yticklabels=labels)
-        plt.yticks(rotation=0, fontsize=6)
-        plt.xticks(rotation=90, fontsize=6)
+        plt.yticks(rotation=0, fontsize=20)
+        plt.xticks(rotation=90, fontsize=20)
         plt.show()
 
     def add_bar(self, x, y):
@@ -125,16 +125,17 @@ class Visualizer(object):
         return ax
 
 
-def plot_ts_slider_highligther(df, meas='GHI', model='Clearsky GHI pvlib', prob='prob', slider_lo=0.0, slider_hi=1, slider_num=21):
+def plot_ts_slider_highligther(df, meas='GHI', model='Clearsky GHI pvlib',
+                               prob='prob', slider_lo=0.0, slider_hi=1, slider_num=21):
     trace_model = go.Scatter(x=df.index, y=df[model], name=model)
     trace_meas = go.Scatter(x=df.index, y=df[meas], name=meas)
     marker_dict = {'color': df[prob], 'colorscale': 'Jet', 'showscale': True, 'size': 8}
     trace_prob = go.Scatter(x=df.index, y=df[meas], mode='markers', marker=marker_dict,
-                            text='P_cloudy = ' + np.round(df[prob], 4).astype(str))
+                            text='P_clear=' + np.round(df[prob], 4).astype(str))
     data = [trace_meas, trace_model, trace_prob]
 
     for i in np.linspace(slider_lo, slider_hi, num=slider_num):
-        trace = go.Scatter(x=df[df[prob] <= i].index, y=df[df[prob] <= i][meas], hoverinfo='none', # name='P_cloudy cutoff ' + str(i),
+        trace = go.Scatter(x=df[df[prob] >= i].index, y=df[df[prob] >= i][meas], hoverinfo='none',
                            mode='markers', marker={'size': 12, 'symbol': 'circle-open', 'color': 'black'})
         data.append(trace)
 
@@ -178,3 +179,56 @@ def plot_ts_slider_highligther(df, meas='GHI', model='Clearsky GHI pvlib', prob=
 
     figure = dict(data=data, layout=layout)
     iplot(figure)
+
+def plot_ts_probas(df, meas='GHI', model='Clearsky GHI pvlib',
+                               prob='prob', slider_lo=0.0, slider_hi=1, slider_num=21):
+    trace_model = go.Scatter(x=df.index, y=df[model], name=model)
+    trace_meas = go.Scatter(x=df.index, y=df[meas], name=meas)
+    marker_dict = {'color': df[prob], 'colorscale': 'Jet', 'showscale': True, 'size': 8}
+    trace_prob = go.Scatter(x=df.index, y=df[meas], mode='markers', marker=marker_dict,
+                            text='P_clear=' + np.round(df[prob], 4).astype(str))
+    data = [trace_meas, trace_model, trace_prob]
+
+    figure = dict(data=data)
+    iplot(figure)
+
+def plot_confusion_matrix(mat, labels=None, normalize=True):
+        if normalize:
+            mat = np.round(mat.astype('float') / mat.sum(axis=1)[:, np.newaxis], 4)
+        layout = {}
+        layout['xaxis'] = {'title': 'Predicted label'}
+        layout['yaxis'] = {'title': 'True label'}
+        fig = ff.create_annotated_heatmap(mat, x=labels, y=labels, colorscale='Blues', showscale=True)
+        # fig = ff.create_annotated_heatmap(mat, x=labels, y=labels)
+        fig.layout.update({'width': 500})
+        fig.layout.xaxis.update({'title': 'predicted label'})
+        fig.layout.yaxis.update({'title': 'true label'})
+        iplot(fig)
+
+def plot_confusion_matrix2(cm, classes,
+                          normalize=True,
+                          title='Confusion matrix',
+                          cmap=matplotlib.cm.get_cmap('Blues')):
+    if normalize:
+        cm = np.round(cm.astype('float') / cm.sum(axis=1)[:, np.newaxis], 4)
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    p = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+    ax.set_title(title)
+    fig.colorbar(p, fraction=0.046, pad=0.04)
+    tick_marks = np.arange(len(classes))
+    ax.set_xticks(tick_marks)
+    ax.set_xticklabels(classes)
+    ax.set_yticks(tick_marks)
+    ax.set_yticklabels(classes)
+
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, cm[i, j],
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    ax.set_ylabel('True label')
+    ax.set_xlabel('Predicted label')
+    fig.tight_layout()
+    return ax

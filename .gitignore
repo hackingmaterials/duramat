@@ -46,8 +46,9 @@ nosetests.xml
 .pydevproject
 
 # Pycharm
-.idea/*
+**.idea/*
 /clearsky_detection/.idea/*
+/ivcurve/.idea/*
 
 # IPython notebook checkpoints
 .ipynb_checkpoints
