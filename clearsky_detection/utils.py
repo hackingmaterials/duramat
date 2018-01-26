@@ -272,13 +272,11 @@ def calc_line_length(df, col, window, dx, label=None, overwrite=False):
         Delta of x values (time in this case).
     label: str
 
-
-
-       Name of re;lfkjultant column.  If None, will add 'line length' to col.
+       Name of resultant column.  If None, will add 'line length' to col.
     overwrite: bool
         Overwrite label if it exists.
     """
-    if label is Non
+    if label is None:
         label = col + ' line length'
     if label in df.keys() and not overwrite:
         raise RuntimeError('Label already exists.  Set overwrite to True or pick new label name.')
@@ -360,24 +358,18 @@ def day_prediction(day, clf, feature_cols, window, meas_col, model_col, overwrit
                 X = day[feature_cols]
                 y_pred = clf.predict(X)
                 y_pred = np.round(y_pred).astype(bool)
-        clear_meas = day[y_pred][meas_col]
-        clear_model = day[y_pred][model_col]
+        clear_meas = day[y_pred.astype(bool)][meas_col]
+        clear_model = day[y_pred.astype(bool)][model_col]
         alpha_last = alpha
 
         if len(clear_meas) == 0:
             alpha = 1
-            # alpha = np.random.random(.9, 1.1)
-            # day[model_col] = day[model_col] * alpha
-            # continue
         else:
-
             def rmse(alp):
                 sqr_err = (clear_meas - (alp * clear_model))**2
                 return np.sqrt(np.mean(sqr_err))
-
             min_scalar = optimize.minimize_scalar(rmse)
             alpha = min_scalar.x
-
             running_alpha *= alpha
 
         day[ml_label] = y_pred
@@ -394,130 +386,6 @@ def day_prediction(day, clf, feature_cols, window, meas_col, model_col, overwrit
     if not converged:
         warnings.warn('Scaling did not converge.', RuntimeWarning)
     return day
-
-# def iter_predict(self, feature_cols, meas_col, model_col, clf, window, n_iter=20,
-#                  tol=1.0e-8, ml_label='sky_status iter', smooth=False, overwrite=True):
-#     """Predict clarity based using classifier that iteratively fits the model column
-#     to the measured column based on clear points.
-#
-#     This function WILL overwrite columns that already exist in the data frame.
-#
-#     Arguments
-#     ---------
-#     feature_cols: list-like
-#         Column names to use as features in ML model.
-#     clf: sklearn estimator
-#         Object with fit and predict methods.
-#     meas_col: str
-#         Column of measured data.
-#     model_col: str
-#         Column of model data.
-#     n_iter, optional: int
-#         Number of iterations for fitting model to measured column.
-#     tol, optoinal: float
-#         Criterion for convergence of modeled and measured clear points.
-#     ml_label, optional: str
-#         Label for predicted clear/cloudy points.
-#     smooth, optional: bool
-#         Smooth results.  Smoothing is aggressive as a point must be clear
-#         in every window it appears in.
-#     overwrite, optional: bool
-#         Permission to overwrite columns if they exist.
-#     """
-#     alpha = 1
-#     for it in range(n_iter):
-#         print(it + 1, alpha)
-#         self.calc_all_window_metrics(window, col1=meas_col, col2=model_col,
-#                                      ratio_label='ratio', abs_ratio_diff_label='abs_diff_ratio', overwrite=overwrite)
-#         X = self.df[feature_cols].values
-#         y_pred = clf.predict(X)
-#         clear_meas = self.df[y_pred][meas_col]
-#         clear_model = self.df[y_pred][model_col]
-#         alpha_last = alpha
-#         def rmse(alpha):
-#             return np.sqrt(np.mean((clear_meas - (alpha * clear_model))**2))
-#         min_scalar = optimize.minimize_scalar(rmse)
-#         alpha = min_scalar.x
-#         if np.abs(alpha - alpha_last) < tol:
-#             break
-#         self.df[model_col] = self.df[model_col] * alpha
-#     if it == n_iter - 1:
-#         warnings.warn('Scaling did not converge.', RuntimeWarning)
-#     self.df[ml_label] = y_pred
-#     if smooth:
-#         self.smooth_ml_label(window * 2, ml_label)
-#     return self.df[ml_label]
-
-# def iter_predict_daily(self, feature_cols, meas_col, model_col, clf, window, n_iter=20,
-#                              tol=1.0e-8, ml_label='sky_status iter', smooth=False, overwrite=True):
-#     """Predict clarity based using classifier that iteratively fits the model column
-#     to the measured column based on clear points.
-#
-#     This method differs from iter_predict method because it predicts/scales on
-#     individual days, not the entire data set.
-#     This function WILL overwrite columns that already exist in the data frame.
-#
-#     Method should be refactored.  Calculating features and scaling model GHI is done across entire data set
-#     even though we only need one day at a time.
-#
-#     Arguments
-#     ---------
-#     feature_cols: list-like
-#         Column names to use as features in ML model.
-#     clf: sklearn estimator
-#         Object with fit and predict methods.
-#     meas_col: str
-#         Column of measured data.
-#     model_col: str
-#         Column of model data.
-#     n_iter, optional: int
-#         Number of iterations for fitting model to measured column.
-#     tol, optoinal: float
-#         Criterion for convergence of modeled and measured clear points.
-#     ml_label, optional: str
-#         Label for predicted clear/cloudy points.
-#     smooth, optional: bool
-#         Smooth results.  Smoothing is aggressive as a point must be clear
-#         in every window it appears in.
-#     overwrite, optional: bool
-#         Permission to overwrite columns if they exist.
-#     """
-#     # dx = self.df.index.freq.nanos / 1.0e9 / 60.0e0
-#     day_dfs = []
-#     groups = self.df.groupby(self.df[[meas_col, model_col]].index.date)
-#     my_list = [day.copy() for (name, day) in groups]
-#     # for name, day in self.df.groupby(self.df[[meas_col, model_col]].index.date):
-#     for day in my_list:
-#         alpha = 1
-#         converged = False
-#         for _ in range(n_iter):
-#             utils.calc_all_window_metrics(day, window, meas_col=meas_col, model_col=model_col, overwrite=overwrite)
-#             X = day[feature_cols].values
-#             y_pred = clf.predict(X)
-#             clear_meas = day[y_pred][meas_col]
-#             clear_model = day[y_pred][model_col]
-#             alpha_last = alpha
-#             def rmse(alpha):
-#                 sqr_err = (clear_meas - (alpha * clear_model))**2
-#                 return np.sqrt(np.mean(sqr_err))
-#             min_scalar = optimize.minimize_scalar(rmse)
-#             alpha = min_scalar.x
-#             day.loc[:, ml_label] = y_pred
-#             if alpha > 1.25 or alpha < .75:
-#                 warnings.warn('Large scaling value.  Day will not be further assessed or scaled.', RuntimeWarning)
-#                 break
-#             day.loc[:, model_col] = day[model_col] * alpha
-#             if np.abs(alpha - alpha_last) < tol:
-#                 converged = True
-#                 break
-#         if not converged:
-#             warnings.warn('Scaling did not converge.', RuntimeWarning)
-#         day_dfs.append(day)
-#     indices = self.df.index
-#     self.df = pd.concat(day_dfs)
-#     self.df.index = indices
-#     return self.df[ml_label]
-
 
 if __name__ == '__main__':
     main()

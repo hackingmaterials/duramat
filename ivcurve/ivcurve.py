@@ -1,4 +1,5 @@
 
+
 import numpy as np
 from scipy import interpolate
 import matplotlib.pyplot as plt
@@ -9,7 +10,25 @@ import utils
 
 class IVCurve(object):
 
-    def __init__(self, voltage, current, name=None, low_voltage_cutoff=25, min_pts=10):
+    """
+    This class is used for processing, analyzing, and extracting information for current-voltage (IV) curves.
+    Current work is focused on building out the parameter extraction for modeling methods (LFM, SAPM).
+    """
+
+    def __init__(self, voltage, current, name=None, low_voltage_cutoff=25, min_pts=25):
+        """Initialize object.
+
+        Parameters
+        ----------
+        voltage: array-like
+        current: array-like
+        name: object
+            Name for sample.
+        low_voltage_cutoff: float
+            Voltages near Isc can be very noisy (based on data used).  Ignore any voltages < this value.
+        min_pts: int
+            Require a minimum number of points to exist for analysis.  This is after removing low voltage points.
+        """
 
         mask = voltage > low_voltage_cutoff
         x = voltage[mask].astype(float)
@@ -17,7 +36,7 @@ class IVCurve(object):
 
         # assure adequate amount of data points
         if len(x) < min_pts or len(y) < min_pts:
-            raise RuntimeError('Not enough values in IV curve.')
+            raise ValueError('Not enough points in IV curve.')
 
         # sorting IV curve by voltage (needed for interpolation)
         xy = np.column_stack((x, y))
@@ -35,22 +54,26 @@ class IVCurve(object):
 
         self.interp_func_ = None
 
-    def is_smooth(self, pct_change=.1):
+    def is_smooth(self, pct_change=.1, start=10, end=10):
         """Check how smooth the interpolated curve is.  A curve is adequately smooth if the maximum percent change
-        between adjacent points is < pct_change.
+        between adjacent points is < pct_change.  This could/should be made more robust.
 
         Parameters
         ----------
         pct_change: float
             Maximum allowed percent change to determine smoothness.
+        start: int
+            Check smoothness of curve from array[start:] (ignore first 'n' points).
+        end:int
+            Check smoothness of curve up to array[:-end] (ignore last 'n' points).
 
         Returns
         -------
         bool
         """
         v, i = self.smooth()
-        v = v[10:-10]
-        i = i[10:-10]
+        v = v[start:-end]
+        i = i[start:-end]
         return np.max(np.abs(np.diff(i) / i[:-1])) < pct_change
 
     def extract_components(self, isc_lim=.1, voc_lim=.1, with_models=False):
@@ -170,8 +193,11 @@ class IVCurve(object):
         return self
 
     def smooth(self, v=None, raw_v=False, der=0, npts=250):
-        """Return smoothed IV curve.  If self.interpolate() is not called first, default interpolant will be
-        initialized.
+        """Return smoothed IV curve.  If self.interpolate() is not called first, default interpolation will be
+        used (see interpolate method).
+
+        Optionally pass specific voltage(s) (v=your_array), use the measured voltage (raw_v=True), or generate
+        npts voltage values between endpoints of measured voltages.
 
         Parameters
         ----------
@@ -183,7 +209,7 @@ class IVCurve(object):
         der: int
             Order of derivative.
         npts: int
-            Number of points to use in IV curve.
+            Number of points to use in IV curve.  Ignored if raw_v is True.
 
         Returns
         -------
@@ -203,15 +229,17 @@ class IVCurve(object):
 
         return v_smooth, i_smooth
 
-    def locate_mismatch(self, atol=.02, dv_cutoff=25, dv_neighbor_cutoff=0,
-                        low_v_cutoff=0, vis=False, vis_with_deriv=True, verbose=False, normalize=False):
-        """Find and return points of mismatch in IV curve.  Mismatches are taken to be local maxima and
-        are found at locations where dI/dV = 0 and d2I/dV2 < 0.
+    def locate_mismatch(self, min_peak=-.02, dv_neighbor_cutoff=0,
+                        low_v_cutoff=0, vis=False, vis_with_deriv=True, verbose=False, normalize=False,
+                        smooth_window=5, smooth_cutoff=1e-4):
+        """Find and return points of mismatch in IV curve.
+
+        Mismatches will be identified by finding peaks near zero in the dI/dV curve.
 
         Parameters
         ----------
-        atol: float
-            Used in np.isclose.
+        min_peak: float
+            Minimum value for a peak.
         dv_cutoff: float
             Maximum allowed change in voltage over which mismatch can occur.
         dv_neighbor_cutoff: int
@@ -221,11 +249,17 @@ class IVCurve(object):
             Remove mismatching very close to 0V.
         vis: bool
             Generate visualization.
+        vis_with_deriv: bool
+            Include derivative in visualization.
         verbose: bool
             Return extra information.
         normalize: bool
             Normalize mismatch_pts by Isc and Voc.  If verbose is True, the smoothed IV curves and derivatives will not
             be normalized.  Normalization will also not be reflected in plots (if vis is True).
+        smooth_window: int
+            Window size to check smoothness of peaks.  Window defined as [i-smooth_window:i+smooth_window].
+        smooth_cutoff: slope
+            If smoothness of derivative near peaks is < smooth_cutoff, the peak is ingored.
 
         Returns
         -------
@@ -247,14 +281,11 @@ class IVCurve(object):
         _, di_dv = self.smooth(der=1)
         _, d2i_dv2 = self.smooth(der=2)
 
-        # if np.max(np.diff(i) / i[:-1]) > .1:
-        #     mismatches = np.zeros(len(v), dtype=bool)
-        # find regions that meet local maxima criteria
         # mismatches = np.isclose(di_dv, 0, atol=atol) & np.less(d2i_dv2, 0)
-        mismatches = utils.detect_peaks(di_dv, mph=-.02)
+        mismatches = utils.get_local_extrema(di_dv, cutoff=min_peak)
 
-        # isolate regions of mismatch
-        indices = np.arange(0, len(v))[mismatches]
+        # isolate regions of mismatch - consider peaks close together as same peak
+        indices = mismatches
         vdiffs = np.insert(np.diff(v[indices]), 0, 0)
         subgroups = []
         group = []
@@ -271,11 +302,9 @@ class IVCurve(object):
         for sg in subgroups:
             if not sg:
                 continue
-            if v[sg[-1]] - v[sg[0]] > dv_cutoff:
-                continue
             max_deriv_idx = np.argmax(di_dv[sg]) + sg[0]
-            slice = di_dv[max_deriv_idx - 5: max_deriv_idx + 5]
-            if np.sqrt(np.mean(np.diff(slice)**2)) < 1.0e-4:
+            window = di_dv[max_deriv_idx - smooth_window: max_deriv_idx + smooth_window]
+            if np.sqrt(np.mean(np.diff(window)**2)) < smooth_cutoff:
                 continue
             if v[max_deriv_idx] > low_v_cutoff:
                 mismatch_pts.append((v[max_deriv_idx], i[max_deriv_idx]))
@@ -284,10 +313,10 @@ class IVCurve(object):
         if vis:
             self.mismatch_vis_(v, i, di_dv, d2i_dv2, mismatch_pts, indices, vis_with_deriv=vis_with_deriv)
 
-        if normalize and len(mismatch_pts) > 0:
-            components = self.extract_components()
-            mismatch_pts[:, 0] = mismatch_pts[:, 0] / components['voc']
-            mismatch_pts[:, 1] = mismatch_pts[:, 1] / components['isc']
+        # if normalize and len(mismatch_pts) > 0:
+        #     components = self.extract_components()
+        #     mismatch_pts[:, 0] = mismatch_pts[:, 0] / components['voc']
+        #     mismatch_pts[:, 1] = mismatch_pts[:, 1] / components['isc']
 
         if verbose:
             return mismatch_pts, {'v': v, 'i': i, 'di_dv': di_dv, 'd2i_dv2': d2i_dv2}
@@ -302,7 +331,7 @@ class IVCurve(object):
         normed_mismatch: list of tuple
             Normalized value pairs.
         """
-        assert False, 'Use IVCurve.locate_mismatch(..., normalize=True, ...).'
+        raise NotImplementedError('Normalization will be done using LFM parameters.')
         mismatch = self.locate_mismatch()
         components = self.extract_components()
         v = np.asarray([a[0] for a in mismatch])
@@ -336,7 +365,7 @@ class IVCurve(object):
         None
         """
         if vis_with_deriv:
-            fig, axes = plt.subplots(nrows=1, ncols=2)
+            fig, axes = plt.subplots(nrows=2, ncols=1, sharex=True)
         else:
             fig, axes = plt.subplots()
 
@@ -354,7 +383,7 @@ class IVCurve(object):
         #            linewidth=2, s=300,alpha=1, zorder=-1)
         _ = ax.legend(loc='lower left')
         _ = ax.set_title('IV profile (sample {})'.format(self.name_))
-        _ = ax.set_xlabel('Voltage / V')
+        # _ = ax.set_xlabel('Voltage / V')
         _ = ax.set_ylabel('Current / A')
 
         if vis_with_deriv:
@@ -394,7 +423,8 @@ class IVCurve(object):
 
         _ = fig.tight_layout()
 
-    def extract_lfm(self):
+    def extract_lfm(self, irrad=None, t_cell=None, beta_vpmax=None, alpha_ipmax=None,
+                    risc=None, rvoc=None, ripmax=None, rvpmax=None):
         """Get parameters from IV necessary for the loss factor model (LFM).
 
         The points needed are:
@@ -405,11 +435,31 @@ class IVCurve(object):
             Ipmax: current at maximum power
             Vpmax: voltage at maximum power
 
+        Parameters
+        ----------
+        irrad: float
+            POA irradiance.
+        t_cell: float
+            Cell temperature (C).
+        beta_vpmax: float
+            Vpmax temperature coefficient.
+        alpha_ipmax: float
+            Ipmax temperature coefficient.
+        risc: float
+            Reference short-circuit current (@ STC).
+        rvoc: float
+            Reference open-circuit voltage (@ STC).
+        ripmax: float
+            Reference MPP current (@ STC).
+        rvpmax: float
+            Reference MPP voltage (@ STC).
+
         Returns
         -------
         lfm_components: dict
             Each key contains the LFM parameters needed.  They are isc, voc, ipmax, vpmax, ir, and vr (see above).
         """
+        raise NotImplementedError('Implementation is incomplete.')
         components = self.extract_components(with_models=True)
         ipmax = components['ipmax']
         vpmax = components['vpmax']
@@ -456,6 +506,7 @@ class IVCurve(object):
             Each key contains a pair of points as np.array [voltage, current].
             The keys are isc, ix, imp, ixx, voc.  Definitions of each key are given above.
         """
+        raise NotImplementedError('Implementation incomplete.')
         components = self.extract_components()
         imp = components['imp']
         vmp = components['vmp']

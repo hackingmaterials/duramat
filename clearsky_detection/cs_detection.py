@@ -670,9 +670,12 @@ class ClearskyDetection(object):
             Dataframe excluding masked rows.
         """
         df = self.df
+        # df[self.masks_] = df[self.masks_].fillna(False)
         if self.masks_:
             for mask_col in self.masks_:
                 df = df[df[mask_col]]
+            # df = np.all(df[self.masks_].values, axis=1)
+
         return df
 
     def add_mask(self, mask_name, mask_array, overwrite=False):
@@ -747,8 +750,19 @@ class ClearskyDetection(object):
         self.df.loc[self.df['GHI'] <= 0, ml_label] = False
         return self.df[ml_label]
 
-    def predict(self, *args, **kwargs):
-        return self.iter_predict_daily(*args, **kwargs)
+    def predict(self, clf, ml_label='sky_status iter', proba_cutoff=.5):
+        self.calc_all_metrics()
+        X = self.df[self.features_].values
+        probas = False
+        try:
+            probas = clf.predict_proba(X)
+            pred = probas[:, 1] >= proba_cutoff
+            self.df['probas'] = probas[:, 1]
+        except AttributeError:
+            pred = clf.predict(X)
+        self.df[ml_label] = pred
+        self.df.loc[self.df['GHI'] <= 0, ml_label] = False
+        return self.df[ml_label]
 
     def downsample(self, min_freq):
         """Samples data frame at every min_freq step.  For example, if self.df is minutely data and every 30th minute
