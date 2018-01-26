@@ -8,6 +8,10 @@ from sklearn import linear_model
 import utils
 
 
+def main():
+    pass
+
+
 class IVCurve(object):
 
     """
@@ -522,3 +526,7 @@ class IVCurve(object):
                            'voc': voc}
 
         return sapm_components
+
+
+if __name__ == '__main__':
+    main()

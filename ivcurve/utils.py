@@ -6,6 +6,10 @@ import scipy.linalg as la
 import matplotlib.pyplot as plt
 
 
+def main():
+    pass
+
+
 def read_iv_csv(fname, round_30min=False):
     """Read IV-curve file from Sandia.
 
@@ -77,7 +81,8 @@ def plot_iv_info(ser, ax=None, ax2=None, savefig=None):
 
 
 def get_local_extrema(array, cutoff=None, mode='maxima'):
-    """Simple peak finding algorithm.  Peaks are considered to be places where a point is greater than it's neighbors.
+    """Simple peak finding algorithm.  Peaks are considered to be
+    places where a point is greater than both neighbors.
 
     Parameters
     ----------
@@ -114,3 +119,7 @@ def get_local_extrema(array, cutoff=None, mode='maxima'):
         raise ValueError('Mode must be either maxima or minima.')
 
     return indices
+
+
+if __name__ == '__main__':
+    main()
