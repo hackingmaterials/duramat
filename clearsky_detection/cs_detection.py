@@ -35,11 +35,6 @@ class ClearskyDetection(object):
         copy: bool
             Permission to copy dataframe.
         """
-        # assert meas_col in df.keys(), 'Measured column name must be in DataFrame.'
-        # assert model_col in df.keys(), 'Modeled column name must be in DataFrame.'
-        # if target_col is not None:
-        #     assert target_col in df.keys(), 'Sky status column name must be in DataFrame.'
-
         self.meas_col = meas_col
         self.model_col = model_col
         self.target_col = target_col
@@ -53,19 +48,15 @@ class ClearskyDetection(object):
             self.df[self.target_col] = self.df[self.target_col].astype(bool)
 
         self.window = self.calc_window()
-        # if solar_noon_col not in self.df.keys():
-        #     self.time_from_solar_noon()
 
         self.masks_ = []
-        # self.features_ = [# 'GHILL-GHIcsLL',
-        #                   'GHI-GHIcs mean',
-        #                   'GHI-GHIcs std',
-        #                   'dGHI-dGHIcs mean',
-        #                   'dGHI-dGHIcs std']# ,
-                          # 'abs(t-tnoon)']
-
-        self.features_ = ['avg(GHI)-avg(GHIcs)', 'max(GHI)-max(GHIcs)', 'GHILL-GHIcsLL', 'std(GHI)-std(GHIcs) normed',
-                          'max(abs(diff(GHI)-diff(GHIcs)))']
+        self.features_ = ['avg(GHI)-avg(GHIcs)',
+                          'max(GHI)-max(GHIcs)',
+                          'GHILL-GHIcsLL',
+                          'std(GHI)-std(GHIcs) normed',
+                          'max(abs(diff(GHI)-diff(GHIcs)))',
+                          'GHI>0']
+                          # 't-tnoon']
 
     @classmethod
     def read_nsrdb_dir(cls, dir_path, timezone, keepers=('GHI', 'Clearsky GHI', 'Cloud Type'), file_ext='csv'):
@@ -473,8 +464,8 @@ class ClearskyDetection(object):
         self.df[label] = clear_skies['ghi']
         self.model_col = label
 
-    def pvlib_clearsky_detect(self, scale=False, measured='GHI',
-                              modeled='Clearsky GHI pvlib', label='sky_status pvlib', window=10, overwrite=False):
+    def pvlib_clearsky_detect(self, scale=False, measured='GHI', modeled='Clearsky GHI pvlib', label='sky_status pvlib',
+                              window=10, pvlib_kwargs={}, overwrite=False):
         """Detect clearsky using PVLib methods.
 
         Parameters
@@ -498,9 +489,10 @@ class ClearskyDetection(object):
         if scale:
             status, _, alpha = \
                 pvlib.clearsky.detect_clearsky(self.df[measured], self.df[modeled],
-                                               self.df.index, window, return_components=True)
+                                               self.df.index, window, **pvlib_kwargs, return_components=True)
         else:
-            status = pvlib.clearsky.detect_clearsky(self.df[measured], self.df[modeled], self.df.index, window)
+            status = pvlib.clearsky.detect_clearsky(self.df[measured], self.df[modeled], self.df.index,
+                                                    window, **pvlib_kwargs)
         self.df[label] = status
         if scale:
             self.df[modeled + ' scaled'] = alpha * self.df[modeled]
@@ -523,6 +515,9 @@ class ClearskyDetection(object):
         """Wrapper function for utils.calc_all_window_metrics for investigating features.
         """
         utils.calc_all_window_metrics(self.df, self.window, self.meas_col, self.model_col, overwrite=True)
+        self.time_from_solar_noon()
+        # for feat in [i for i in self.features_ if i not in ('t-tnoon', 'std(GHI)-std(GHIcs) normed')]:
+        #     self.df[feat] = (self.df[feat] / self.df['GHI mean']).replace([np.nan, np.inf, -np.inf], 0)
 
     def calc_window_stats(self, col, overwrite=False):
         """Caclulates mean, std, min, max across all windows for specified column.
@@ -557,7 +552,6 @@ class ClearskyDetection(object):
                 return np.sqrt(np.mean(sqr_err))
 
             alp = optimize.minimize_scalar(rmse).x
-            # group[self.model_col] = alp * group[self.model_col]
             self.df.loc[self.df.index.isin(group.index), self.model_col] = alp * group[self.model_col]
 
     def fit_model(self, clf, scale=True, clean=False, sample_weight=None, *args, **kwargs):
@@ -635,32 +629,6 @@ class ClearskyDetection(object):
         else:
             self.masks_ = [i for i in self.masks_ if i not in which]
 
-    def apply_all_masks(self, mask_names=None):
-        """
-
-        Parameters
-        ----------
-        mask_names: list-like
-            Names of masks to use.
-
-        Returns
-        -------
-        single_mask: np.array of bool
-            True/False values from applying all masks.
-        """
-        if mask_names is None:
-            mask_names = self.masks_
-        if type(mask_names) == str:
-            mask_names = [mask_names]
-        print(mask_names)
-        if not all(i in self.masks_ for i in mask_names):
-            raise ValueError('Specifid mask not in masks_ attribute.')
-        masks = self.df[mask_names].values.astype(int)
-        # masks = self.df[self.masks_].values.astype(int)
-        single_mask = np.sum(masks, axis=1)
-        single_mask = single_mask > 0
-        return single_mask
-
     def get_masked_df(self):
         """Returns dataframe where all masks are true.
 
@@ -675,10 +643,9 @@ class ClearskyDetection(object):
             for mask_col in self.masks_:
                 df = df[df[mask_col]]
             # df = np.all(df[self.masks_].values, axis=1)
-
         return df
 
-    def add_mask(self, mask_name, mask_array, overwrite=False):
+    def add_mask(self, mask_name, mask_array, fillval=False, overwrite=False):
         """Add bool mask to dataframe.
 
         Parameters
@@ -691,8 +658,7 @@ class ClearskyDetection(object):
         if mask_name in self.df.keys() and not overwrite:
             raise RuntimeError('Mask name already exists.  Allow overwriting or rename.')
         self.df[mask_name] = mask_array
-        # except ValueError:
-        #     self.df[self.df.index.isin(mask_array.index)] = mask_array.values
+        self.df[mask_name] = self.df[mask_name].fillna(fillval)
         self.masks_.append(mask_name)
 
     def iter_predict_daily(self, clf, n_iter=20, tol=1.0e-8, ml_label='sky_status iter',
@@ -753,7 +719,6 @@ class ClearskyDetection(object):
     def predict(self, clf, ml_label='sky_status iter', proba_cutoff=.5):
         self.calc_all_metrics()
         X = self.df[self.features_].values
-        probas = False
         try:
             probas = clf.predict_proba(X)
             pred = probas[:, 1] >= proba_cutoff
@@ -810,7 +775,7 @@ class ClearskyDetection(object):
 
         ts = np.zeros(len(tstamps), dtype=int)
         vals = self.df[self.model_col].values.astype(int)
-        label = 'abs(t-tnoon)'
+        label = 't-tnoon'
         # print(indices.nbytes / 1e6)
         # print(ts.nbytes / 1e6)
         # print(vals.nbytes / 1e6)
@@ -821,6 +786,115 @@ class ClearskyDetection(object):
             # ts[i] = np.abs(i - (argmax + ix[0])) * dt
         # times = np.asarray(time_steps) * dt
         self.df[label] = ts
+
+    def get_features_and_targets(self, nsrdb_obj, tsplit=None):
+        # filter and preprocess data
+        #   fill values < 0 to 0
+        #   add in target column
+        #   remove missing days
+        #   remove periods with missing cloud data
+        #   remove periods where nsrdb and ground disagree
+        nsrdb_obj.intersection(self.df.index)
+        self.add_target_col(nsrdb_obj)
+
+        # scale model
+        #   scales the modeled clear sky to measured clear sky at points labeled clear in 'sky_status' column
+        #   this is done on the filtered data frame (all masks applied before scaling)
+        self.scale_model()
+
+        self.fill_low_to_zero()
+        self.mask_missing_days()
+        self.mask_missing_clouds(nsrdb_obj)
+        self.mask_nsrdb_incorrect_clouds(nsrdb_obj)
+        self.mask_nsrdb_mismatch(nsrdb_obj)
+
+        # calculate window based ML metrics
+        self.calc_all_metrics()
+        # for feat in ['avg(GHI)-avg(GHIcs)', 'max(GHI)-max(GHIcs)', 'GHILL-GHIcsLL', 'max(abs(diff(GHI)-diff(GHIcs)))']:
+        #     self.df[feat] = (self.df[feat] / self.df['GHI mean']).replace([-np.inf, np.inf, np.nan], 0)
+
+        # mask for splitting by time (useful for CV, train/test splitting)
+        if tsplit is not None:
+            self.df['before'] = self.df.index < tsplit
+        else:
+            self.df['before'] = True
+
+        # return feature matrix and target vector as dataframes
+        return self.df[self.features_], self.df[self.target_col], self.df[self.masks_].all(axis=1), self.df['before']
+
+    def add_target_col(self, nsrdb_obj, name='sky_status'):
+        """Add in a target column (for classification).
+
+        Parameters
+        ----------
+        nsrdb_obj: ClearskyDetection object
+            Must have 'sky_status' column (or 'Cloud Type' and 'GHI' from which it can be derived).
+        name: str
+            Name of target column
+
+        Returns
+        -------
+        None
+        """
+        self.target_col = name
+        if name not in nsrdb_obj.df.keys():
+            nsrdb_obj.set_nsrdb_sky_status()
+        self.df[self.target_col] = nsrdb_obj.df[name].astype(int)
+        self.df[self.target_col] = self.df[self.target_col].fillna(0).astype(int)
+
+    def fill_low_to_zero(self, low_cutoff=0):
+        """Make GHI values below zero equal to zero.
+
+        Parameters
+        ----------
+        low_cutoff
+
+        Returns
+        -------
+
+        """
+        self.df[self.df[self.meas_col] < low_cutoff][self.meas_col] = 0
+
+    def mask_missing_days(self, daily_cutoff=200):
+        resample = self.df[self.meas_col].resample('D').sum()
+        bad_dates = resample[resample < daily_cutoff].index.date
+        mask = ~np.isin(self.df.index, bad_dates)
+        self.add_mask('empty_days', mask, overwrite=True)
+
+    def mask_missing_clouds(self, nsrdb_obj):
+        mask = nsrdb_obj.df['Cloud Type'].astype(int) >= 0
+        self.add_mask('has_clouds', mask, overwrite=True)
+
+    def mask_irrad(self, cutoff=200):
+        mask = self.df['GHI'] >= 200
+        self.add_mask('low_irrad', mask)
+
+    def mask_nsrdb_incorrect_clouds(self, nsrdb_obj, ratio_mean_val=.05, diff_mean_val=50, label='nsrdb_cloud_quality'):
+        """Generate mask to remove incorrectly labeled points from training set.
+
+        Resulting mask should remove the cloudy points that 'look' clear.  It should include
+        every period originally labeled as clear.
+
+        By default, no filtering is done.  Must actively choose to do so.
+        """
+        if 'sky_status' not in nsrdb_obj.df.keys():
+            nsrdb_obj.set_nsrdb_sky_status()
+        nsrdb_obj.scale_model()
+        utils.calc_all_window_metrics(nsrdb_obj.df, 3, self.meas_col, self.model_col, overwrite=True)
+        nsrdb_obj.df[label] = True
+        if ratio_mean_val is not None and diff_mean_val is not None:
+            nsrdb_obj.df.loc[(~nsrdb_obj.df['sky_status']) &
+                             ((np.abs(1 - nsrdb_obj.df['GHI/GHIcs mean']) <= ratio_mean_val) |
+                             (np.abs(nsrdb_obj.df['GHI-GHIcs mean']) <= diff_mean_val)) &
+                             (nsrdb_obj.df['GHI'] > 0), label] = False
+        self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
+
+    def mask_nsrdb_mismatch(self, nsrdb_obj, ratio_threshold=.05, diff_threshold=50, label='nsrdb_mismatch'):
+        indices = self.df.index.intersection(nsrdb_obj.df.index)
+        mask1 = np.abs(1 - (nsrdb_obj.df.loc[indices]['GHI'] / self.df.loc[indices]['GHI']).fillna(1)) <= ratio_threshold
+        mask2 = np.abs(nsrdb_obj.df.loc[indices]['GHI'] - self.df.loc[indices]['GHI']) <= diff_threshold
+        mask = mask1 | mask2
+        self.add_mask(label, mask, overwrite=True)
 
     def cross_val_score(self, clf, cv=5, filter_fit=False, filter_score=False, scoring='accuracy', filter_kwargs=None,
                         fit_args=None, fit_kwargs=None, predict_args=None, predict_kwargs=None,

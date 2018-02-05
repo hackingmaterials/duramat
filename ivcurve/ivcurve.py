@@ -52,7 +52,7 @@ class IVCurve(object):
         self.i_ = y
 
         if name is not None:
-           self.name_ = name
+            self.name_ = name
         else:
             self.name_ = 0
 
@@ -80,11 +80,28 @@ class IVCurve(object):
         i = i[start:-end]
         return np.max(np.abs(np.diff(i) / i[:-1])) < pct_change
 
-    def extract_components(self, isc_lim=.1, voc_lim=.1, with_models=False):
-        """Extract Common IV curve characteristics.
+    def extract_components(self, isc_lim=.1, voc_lim=.1, mode='all'):# , with_models=False):
+        """Extract Common IV curve characteristics.  Optionally returns parameters needed for modeling with the
+        Loss Factor Model and the Sanida Array Performance Model.
 
         Isc and Voc are found by performing a linear regression on endpoints of the data.
         Rs and Rsh are determined used slopes from the above regression.
+
+        The characterisitics are:
+            Isc: short-circuit current
+            Voc: open-circuit voltage
+            Ipmax: current at maximum power
+            Vpmax: voltage at maximum power
+            Rs: series resistance
+            Rsh: shunt resistance
+
+        Additional values for LFM:
+            Vr: voltage at intersection of Rsh and Rs tangent line
+            Ir: current at intersection of Rsh and Rs tangent line
+
+        Additional values for SAPM:
+            Ix: current at 1/2 Voc
+            Ixx: current at 1/2 (Voc + Vpmax)
 
         Parameters
         ----------
@@ -92,11 +109,13 @@ class IVCurve(object):
             Percent or number of data points to calculate Isc and Rsh with.
         voc_lim: float or int
             Percent or number of data points to calculate Voc and Rs with.
+        mode: str
+            Return extra parameters for specific performance models (lfm, sapm).
 
         Returns
         -------
         params: dict
-            Contains values for pmax, vpmax, ipmax, isc, voc, ff, rs, rsh (these are the key names).
+            Key and value pairs are described above.
         """
         v, i = self.smooth()
 
@@ -108,7 +127,7 @@ class IVCurve(object):
 
         # isc and rsh
         if type(isc_lim) == float:
-            isc_size = int(len(v) * isc_lim)
+            isc_size = int(len(i) * isc_lim)
         else:
             isc_size = isc_lim
         isc_lm = linear_model.LinearRegression().fit(v[:isc_size].reshape(-1, 1), i[:isc_size].reshape(-1, 1))
@@ -128,11 +147,37 @@ class IVCurve(object):
         # fill factor
         ff = (ipmax * vpmax) / (isc * voc) * 100
 
-        params = {'pmax': pmax, 'vpmax': vpmax, 'ipmax': ipmax, 'voc': voc, 'isc': isc, 'rs': rs, 'rsh': rsh, 'ff': ff}
+        params = {'pmax': pmax,
+                  'vpmax': vpmax,
+                  'ipmax': ipmax,
+                  'voc': voc,
+                  'isc': isc,
+                  'rs': rs,
+                  'rsh': rsh,
+                  'ff': ff}
 
-        if with_models:
-            params['isc_lm'] = isc_lm
-            params['voc_lm'] = voc_lm
+        # LFM
+        if mode.lower() in ('all', 'lfm'):
+            isc_lm_m, isc_lm_b = isc_lm.coef_[0], isc_lm.intercept_[0]
+            voc_lm_m, voc_lm_b = voc_lm.coef_[0], voc_lm.intercept_[0]
+
+            vr = ((isc_lm_b * voc_lm_m) + voc_lm_b) / (1 - (isc_lm_m * voc_lm_m))
+            vr = vr[0]
+            ir = isc_lm.predict(np.asarray([vr]).reshape(-1, 1))[0][0]
+
+            params['vr'] = vr
+            params['ir'] = ir
+
+        # SAPM
+        if mode.lower() in ('all', 'sapm'):
+            ix = self.smooth(np.asarray([.5 * voc]))
+            ixx = self.smooth(np.asarray([.5 * (voc + vpmax)]))
+            params['ix'] = ix
+            params['ixx'] = ixx
+
+        # if with_models:
+        #     params['isc_lm'] = isc_lm
+        #     params['voc_lm'] = voc_lm
 
         return params
 
@@ -234,7 +279,7 @@ class IVCurve(object):
         return v_smooth, i_smooth
 
     def locate_mismatch(self, min_peak=-.02, dv_neighbor_cutoff=0,
-                        low_v_cutoff=0, vis=False, vis_with_deriv=True, verbose=False, normalize=False,
+                        low_v_cutoff=0, vis=False, vis_with_deriv=True, verbose=False,
                         smooth_window=5, smooth_cutoff=1e-4):
         """Find and return points of mismatch in IV curve.
 
@@ -244,8 +289,6 @@ class IVCurve(object):
         ----------
         min_peak: float
             Minimum value for a peak.
-        dv_cutoff: float
-            Maximum allowed change in voltage over which mismatch can occur.
         dv_neighbor_cutoff: int
             This cutoff is a smoothing parameter for points that may be in the same mismatch region.
             If the index of a point is <= to it's neighbors, they are considered to be the same mismatch region.
@@ -316,11 +359,6 @@ class IVCurve(object):
 
         if vis:
             self.mismatch_vis_(v, i, di_dv, d2i_dv2, mismatch_pts, indices, vis_with_deriv=vis_with_deriv)
-
-        # if normalize and len(mismatch_pts) > 0:
-        #     components = self.extract_components()
-        #     mismatch_pts[:, 0] = mismatch_pts[:, 0] / components['voc']
-        #     mismatch_pts[:, 1] = mismatch_pts[:, 1] / components['isc']
 
         if verbose:
             return mismatch_pts, {'v': v, 'i': i, 'di_dv': di_dv, 'd2i_dv2': d2i_dv2}
@@ -403,7 +441,7 @@ class IVCurve(object):
 
         _ = fig.tight_layout()
 
-    def plot(self):
+    def plot(self, ax=None):
         """Generate IV curve plot.  Will show raw data points and smoothed function.  MPP will be marked.
 
         Returns
@@ -411,21 +449,22 @@ class IVCurve(object):
         None
         """
         v, i = self.smooth()
-        components = self.extract_components()
+        components = self.extract_components(mode=None)
 
-        fig, ax = plt.subplots()
+        if ax is None:
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+
         ax.plot(self.v_, self.i_, label='raw data')
         ax.plot(v, i, label='smoothed data')
         ax.scatter(components['vpmax'], components['ipmax'], label='MPP', c='k', zorder=100)
         ax.plot([0, components['vpmax']], [components['ipmax'], components['ipmax']], linestyle='--', c='k', alpha=.5)
         ax.plot([components['vpmax'], components['vpmax']], [0, components['ipmax']], linestyle='--', c='k', alpha=.5)
 
-        _ = ax.legend()
-        _ = ax.set_title('IV profile (sample {})'.format(self.name_))
-        _ = ax.set_xlabel('Voltage / V')
-        _ = ax.set_ylabel('Current / A')
-
-        _ = fig.tight_layout()
+        ax.legend()
+        ax.set_title('IV profile (sample {})'.format(self.name_))
+        ax.set_xlabel('Voltage / V')
+        ax.set_ylabel('Current / A')
 
     def extract_lfm(self, irrad=None, t_cell=None, beta_vpmax=None, alpha_ipmax=None,
                     risc=None, rvoc=None, ripmax=None, rvpmax=None):
@@ -463,7 +502,7 @@ class IVCurve(object):
         lfm_components: dict
             Each key contains the LFM parameters needed.  They are isc, voc, ipmax, vpmax, ir, and vr (see above).
         """
-        raise NotImplementedError('Implementation is incomplete.')
+        raise NotImplementedError("Use extract_components(..., mode='lfm', ...)")
         components = self.extract_components(with_models=True)
         ipmax = components['ipmax']
         vpmax = components['vpmax']
@@ -480,6 +519,7 @@ class IVCurve(object):
         voc_lm_b = voc_lm.intercept_[0]
 
         vr = ((isc_lm_b * voc_lm_m) + voc_lm_b) / (1 - (isc_lm_m * voc_lm_m))
+        vr = vr[0]
         ir = isc_lm.predict(np.asarray([vr]).reshape(-1, 1))[0][0]
 
         lfm_components = {'isc': isc,
@@ -510,7 +550,7 @@ class IVCurve(object):
             Each key contains a pair of points as np.array [voltage, current].
             The keys are isc, ix, imp, ixx, voc.  Definitions of each key are given above.
         """
-        raise NotImplementedError('Implementation incomplete.')
+        raise NotImplementedError("Use extract_components(..., mode='sapm', ...)")
         components = self.extract_components()
         imp = components['imp']
         vmp = components['vmp']
@@ -526,6 +566,16 @@ class IVCurve(object):
                            'voc': voc}
 
         return sapm_components
+
+    def translate_to_stc(self, irrad, temp, alpha, beta, kappa=1):
+        params = self.extract_components()
+
+        voc_new = params['voc'] - (params['rs'] * (0 - 0)) - (kappa * 0 * (25 - temp)) + (beta * (25 - temp))
+        v1, i1 = self.smooth(v=np.linspace(0, voc_new + 50, 250))
+        i2 = i1 + (params['isc'] * ((1000 / irrad) - 1)) + (alpha * (25 - temp))
+        v2 = v1 - (params['rs'] * (i2 - i1)) - (kappa * i2 * (25 - temp)) + (beta * (25 - temp))
+
+        return v2[v2 <= voc_new], i2[v2 <= voc_new]
 
 
 if __name__ == '__main__':
