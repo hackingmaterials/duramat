@@ -427,6 +427,35 @@ class ProbabilityRandomForestClassifier(ensemble.RandomForestClassifier):
         # labels = np.all(labels[slices], axis=1)
         return labels
 
+class ProbabilityXGBClassifier(xgb.XGBClassifier):
+
+    def __init__(self, proba_cutoff=0.5, window=None,
+                 n_estimators=10, criterion='gini', max_depth=None, min_samples_split=2, min_samples_leaf=1,
+                 min_weight_fraction_leaf=0.0, max_features='auto', max_leaf_nodes=None, min_impurity_decrease=0.0,
+                 min_impurity_split=0, bootstrap=True, oob_score=False, n_jobs=1, random_state=None,
+                 verbose=0, warm_start=False, class_weight=None ):
+        super().__init__(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth,
+                         min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
+                         min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features,
+                         max_leaf_nodes=max_leaf_nodes, # min_impurity_decrease=min_impurity_decrease,
+                         min_impurity_split=min_impurity_split, bootstrap=bootstrap, oob_score=oob_score,
+                         n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start,
+                         class_weight=class_weight)
+        self.proba_cutoff = proba_cutoff
+        self.window = window
+
+    def predict(self, X):
+        labels = self.predict_proba(X)[:, 1] >= self.proba_cutoff
+        # labels = np.convolve(labels, np.ones(self.window) / self.window, mode='same')
+        # labels = labels > self.proba_cutoff
+        # slices = np.arange(len(labels))
+        # slices = [slices[i: i + self.window] for i in range(len(labels) - self.window + 1)]
+        # for i in range(self.window // 2):
+        #     slices.insert(0, slices[0])
+        #     slices.append(slices[-1])
+        # labels = np.all(labels[slices], axis=1)
+        return labels
+
 
 def f1_tnr(ytrue, yhat):
     f1 = metrics.f1_score(ytrue, yhat)
@@ -487,27 +516,50 @@ def plot_confusion_matrix(cm, classes=['cloudy', 'clear'],
     fig.tight_layout()
 
 
-def plot_ml_vs_nsrdb(ground_obj, yhat, mask, tsplit, t0, t1, yhat_label='ml_status', plot_label='ML clear'):
-    fig, ax = plt.subplots(figsize=(16, 6))
-
+def plot_ml_vs_nsrdb(ground_obj, yhat, mask, tsplit, t0, t1,
+                     yhat_label='ml_status', plot_label='ML clear',
+                     fig_kwargs={}, fname='tmp.png'):
     df = ground_obj.df[~tsplit]
     df[yhat_label] = yhat
 
     df = df[(df.index >= t0) & (df.index < t1)]
+    nplots = len(pd.unique(df.index.date))
+    ncol = min(3, nplots)
+    nrow = max(1, (nplots // ncol))
+    try:
+        figsize = fig_kwargs.pop('figsize')
+    except KeyError:
+        figsize = (ncol * 6, nrow * 6)
 
-    ax.plot(df.index, df['GHI'], label='GHI', c='k')
-    ax.plot(df.index, df['Clearsky GHI pvlib'], label='GHIcs', c='k', alpha=.5)
+    fig, axes = plt.subplots(figsize=figsize, ncols=ncol, nrows=nrow, sharey=True)
+    if ncol == 1:
+        axes = np.asarray([axes])
 
-    ax.scatter(df[df[yhat_label]].index, df[df[yhat_label]]['GHI'], label=plot_label)
-    ax.scatter(df[df[yhat_label] & mask].index, df[df[yhat_label] & mask]['GHI'], label='NSRDB clear',
-               marker='o', s=250, facecolor='none', edgecolor='C1', linewidth=2)
+    for i, (date, group) in enumerate(df.groupby(df.index.date)):
+        group = group[(group.index.hour >= 4) & (group.index.hour <= 20)]
+        ax = axes.ravel()[i]
+        ax.set_title(date)
+        ax.set_xticks([i for i in group.index.time if i.minute % 60 == 0][::2])
+        ax.set_xticklabels([i for i in group.index.time if i.minute % 60 == 0][::2])
+        if i % ncol == 0:
+            ax.set_ylabel('GHI / Wm$^{-2}$')
+        a = ax.plot(group.index.time, group['GHI'], label='GHI', c='k')
+        b = ax.plot(group.index.time, group['Clearsky GHI pvlib'], label='GHIcs', c='k', alpha=.5)
+        c = ax.plot(group.index.time, group['GHI nsrdb'], label='GHInsrdb', c='k', alpha=.5, linestyle='--')
 
-    ax.legend()
-    ax.set_title('Ground and NSRDB Detection')
-    ax.set_xlabel('Date')
-    ax.set_ylabel('GHI / $\mathrm{Wm}^{-2}$')
+        d = ax.scatter(group[group[yhat_label]].index.time, group[group[yhat_label]]['GHI'], label=plot_label)
+
+        e = ax.scatter(group[group['sky_status'] & mask].index.time, group[group['sky_status'] & mask]['GHI'], label='NSRDB clear',
+                   marker='o', s=250, facecolor='none', edgecolor='C1', linewidth=2)
+
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='best', prop={'size': 14}, shadow=False, framealpha=1)
+    # fig.text(.04, .5, 'GHI / Wm$^{-2}$', va='center', rotation='vertical')
     fig.tight_layout()
     fig.autofmt_xdate()
+    fig.savefig(fname, dpi=300)
+
+
 
 
 def plot_proba(ground_obj, probas, mask, tsplit, t0, t1):
@@ -559,6 +611,75 @@ def my_kf_cv(clf, X_tr, y_tr, n_splits=3, max_depth_range=range(6, 21),
     results_df = pd.DataFrame(results)
     return results_df[results_df['mean_scores'] == results_df['mean_scores'].max()].to_dict(orient='records')[0]
 
+def plot_marked_masks(ground_obj, t0, t1, fname='tmp.png'):
+    # fig, ax = plt.subplots(figsize=(20, 10), dpi=300)
+
+    df = ground_obj.df
+    df = df[(df.index >= t0) & (df.index < t1)]
+
+    # ax.plot(df.index, df['GHI'], label='GHI', c='k')
+    # ax.plot(df.index, df['Clearsky GHI pvlib'], label='GHIcs', c='k', alpha=.5)
+    # ax.plot(df.index, df['GHI nsrdb'], label='GHInsrdb', c='k', alpha=.5, linestyle='--')
+
+    # ax.scatter(df[df['sky_status'].astype(bool)].index, df[df['sky_status'].astype(bool)]['GHI'], label='NSRDB clear',
+    #            marker='o', s=250, facecolor='none', edgecolor='C1', linewidth=2)
+
+    use_masks = [i for i in ground_obj.masks_ if i not in ('empty_days', 'day_time')]
+    # for m, mark in zip(ground_obj.masks_, ['o', 'x', '+', '^', '.']):
+    #     ax.scatter(df[~df[m] & (df['GHI'] > 0)].index, df[~df[m] & (df['GHI'] > 0)]['GHI'], label=m, marker=mark, s=250, zorder=10)
+
+    # df = ground_obj.df[~tsplit]
+    # df[yhat_label] = yhat
+
+    df = df[(df.index >= t0) & (df.index < t1)]
+    nplots = len(pd.unique(df.index.date))
+    ncol = min(3, nplots)
+    nrow = max(1, (nplots // ncol))
+    fig, axes = plt.subplots(figsize=(ncol * 6, (nrow) * 6), ncols=ncol, nrows=nrow, sharey=True)
+
+    for i, (date, group) in enumerate(df.groupby(df.index.date)):
+        group = group[(group.index.hour >= 4) & (group.index.hour <= 20)]
+        ax = axes.ravel()[i]
+        ax.set_title(date)
+        ax.set_xticks([i for i in group.index.time if i.minute % 60 == 0][::2])
+        ax.set_xticklabels([i for i in group.index.time if i.minute % 60 == 0][::2])
+        a = ax.plot(group.index.time, group['GHI'], label='GHI', c='k')
+        b = ax.plot(group.index.time, group['Clearsky GHI pvlib'], label='GHIcs', c='k', alpha=.5)
+        c = ax.plot(group.index.time, group['GHI nsrdb'], label='GHInsrdb', c='k', alpha=.5, linestyle='--')
+        e = ax.scatter(group[group['sky_status'].astype(bool)].index.time, group[group['sky_status'].astype(bool)]['GHI'],
+                       label='NSRDB clear',
+                       marker='o', s=250, facecolor='none', edgecolor='C1', linewidth=2)
+
+        for m, mark, color in zip(use_masks, ['o', 'x', '+', '^', '.'], ['C2', 'C3', 'C4', 'C5', 'C6']):
+            ax.scatter(group[~group[m] & (group['GHI'] > 0)].index.time,
+                       group[~group[m] & (group['GHI'] > 0)]['GHI'], label=m, marker=mark, s=250, zorder=10, c=color)
+
+        # if ax is axes[-1]:
+        #     ax.legend()
+
+        # d = ax.scatter(group[group[yhat_label]].index.time, group[group[yhat_label]]['GHI'], label=plot_label)
+
+
+    handles, labels = ax.get_legend_handles_labels()
+    # fig.subplots_adjust(right=.2)
+    # fig.legend(handles, labels, loc='best', prop={'size': 14}, shadow=False, framealpha=1, bbox_to_anchor=(1.05, .9))
+    fig.legend(handles, labels, loc='upper right', prop={'size': 14}, shadow=False, framealpha=1)
+    fig.tight_layout()
+    fig.autofmt_xdate()
+    fig.savefig(fname, dpi=300)
+
+
+    # ax.scatter(df[~df['sky_status'] & ~mask].index, df[~df['sky_status'] & ~mask]['GHI'], label='NSRDB cloudy (unmasked)',
+    #            marker='x', s=250, c='C3', linewidth=2)
+
+
+    # ax.legend()
+    # ax.set_title('Ground and NSRDB Detection')
+    # ax.set_xlabel('Date')
+    # ax.set_ylabel('GHI / $\mathrm{Wm}^{-2}$')
+    # fig.tight_layout()
+    # fig.autofmt_xdate()
+    # fig.savefig(fname, dpi=300)
 
 if __name__ == '__main__':
     main()

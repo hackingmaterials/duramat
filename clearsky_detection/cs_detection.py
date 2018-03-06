@@ -787,7 +787,7 @@ class ClearskyDetection(object):
         # times = np.asarray(time_steps) * dt
         self.df[label] = ts
 
-    def get_features_and_targets(self, nsrdb_obj, tsplit=None):
+    def get_features_and_targets(self, nsrdb_obj, tsplit=None, ignore_nsrdb_mismatch=False):
         # filter and preprocess data
         #   fill values < 0 to 0
         #   add in target column
@@ -796,7 +796,7 @@ class ClearskyDetection(object):
         #   remove periods where nsrdb and ground disagree
         nsrdb_obj.intersection(self.df.index)
         self.add_target_col(nsrdb_obj)
-
+        self.add_data_col(nsrdb_obj, 'GHI')
         # scale model
         #   scales the modeled clear sky to measured clear sky at points labeled clear in 'sky_status' column
         #   this is done on the filtered data frame (all masks applied before scaling)
@@ -804,14 +804,15 @@ class ClearskyDetection(object):
 
         self.fill_low_to_zero()
         self.mask_missing_days()
+        self.mask_night()
         self.mask_missing_clouds(nsrdb_obj)
         self.mask_nsrdb_incorrect_clouds(nsrdb_obj)
-        self.mask_nsrdb_mismatch(nsrdb_obj)
+        self.mask_nsrdb_incorrect_clear(nsrdb_obj)
+        if not ignore_nsrdb_mismatch:
+            self.mask_nsrdb_mismatch(nsrdb_obj)
 
         # calculate window based ML metrics
         self.calc_all_metrics()
-        # for feat in ['avg(GHI)-avg(GHIcs)', 'max(GHI)-max(GHIcs)', 'GHILL-GHIcsLL', 'max(abs(diff(GHI)-diff(GHIcs)))']:
-        #     self.df[feat] = (self.df[feat] / self.df['GHI mean']).replace([-np.inf, np.inf, np.nan], 0)
 
         # mask for splitting by time (useful for CV, train/test splitting)
         if tsplit is not None:
@@ -842,6 +843,10 @@ class ClearskyDetection(object):
         self.df[self.target_col] = nsrdb_obj.df[name].astype(int)
         self.df[self.target_col] = self.df[self.target_col].fillna(0).astype(int)
 
+    def add_data_col(self, nsrdb_obj, col):
+        self.df[col + ' nsrdb'] = nsrdb_obj.df[col]
+        self.df[col + ' nsrdb'] = self.df[col + ' nsrdb'].interpolate()
+
     def fill_low_to_zero(self, low_cutoff=0):
         """Make GHI values below zero equal to zero.
 
@@ -853,19 +858,26 @@ class ClearskyDetection(object):
         -------
 
         """
-        self.df[self.df[self.meas_col] < low_cutoff][self.meas_col] = 0
+        self.df.loc[self.df[self.meas_col] < low_cutoff, self.meas_col] = 0
+        self.df[self.meas_col] = self.df[self.meas_col].fillna(0)
 
     def mask_missing_days(self, daily_cutoff=200):
+        """Mask entire days where total irradiance is too low.
+        """
         resample = self.df[self.meas_col].resample('D').sum()
         bad_dates = resample[resample < daily_cutoff].index.date
         mask = ~np.isin(self.df.index, bad_dates)
         self.add_mask('empty_days', mask, overwrite=True)
 
     def mask_missing_clouds(self, nsrdb_obj):
+        """Mask periods missing cloud data (Cloud Type < 0).
+        """
         mask = nsrdb_obj.df['Cloud Type'].astype(int) >= 0
         self.add_mask('has_clouds', mask, overwrite=True)
 
     def mask_irrad(self, cutoff=200):
+        """Mask low irradiance values.
+        """
         mask = self.df['GHI'] >= 200
         self.add_mask('low_irrad', mask)
 
@@ -880,21 +892,43 @@ class ClearskyDetection(object):
         if 'sky_status' not in nsrdb_obj.df.keys():
             nsrdb_obj.set_nsrdb_sky_status()
         nsrdb_obj.scale_model()
-        utils.calc_all_window_metrics(nsrdb_obj.df, 3, self.meas_col, self.model_col, overwrite=True)
+        # utils.calc_all_window_metrics(nsrdb_obj.df, 3, self.meas_col, self.model_col, overwrite=True)
         nsrdb_obj.df[label] = True
         if ratio_mean_val is not None and diff_mean_val is not None:
             nsrdb_obj.df.loc[(~nsrdb_obj.df['sky_status']) &
-                             ((np.abs(1 - nsrdb_obj.df['GHI/GHIcs mean']) <= ratio_mean_val) |
-                             (np.abs(nsrdb_obj.df['GHI-GHIcs mean']) <= diff_mean_val)) &
+                             # ((np.abs(1 - nsrdb_obj.df['GHI/GHIcs mean']) <= ratio_mean_val) |
+                             # (np.abs(nsrdb_obj.df['GHI-GHIcs mean']) <= diff_mean_val)) &
+                             (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) <= diff_mean_val) &
                              (nsrdb_obj.df['GHI'] > 0), label] = False
         self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
 
-    def mask_nsrdb_mismatch(self, nsrdb_obj, ratio_threshold=.05, diff_threshold=50, label='nsrdb_mismatch'):
+    def mask_nsrdb_incorrect_clear(self, nsrdb_obj, diff_mean_val=50, label='nsrdb_clear_quality'):
+        """Mask periods where NSRDB labeled points as clear even though GHI and GHIcs are 'too different'.
+        """
+        nsrdb_obj.scale_model()
+        # utils.calc_all_window_metrics(nsrdb_obj.df, 3, self.meas_col, self.model_col, overwrite=True)
+        nsrdb_obj.df[label] = True
+        nsrdb_obj.df.loc[(nsrdb_obj.df['sky_status']) &
+                         (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) > diff_mean_val), label] = False
+        #                (np.abs(nsrdb_obj.df['GHI-GHIcs mean']) > diff_mean_val), label] = False
+        self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
+
+    def mask_nsrdb_mismatch(self, nsrdb_obj, ratio_threshold=.1, diff_threshold=100, label='nsrdb_mismatch'):
+        """Add filter to mask periods when NSRDB and ground measurements are 'too different'.
+        """
         indices = self.df.index.intersection(nsrdb_obj.df.index)
-        mask1 = np.abs(1 - (nsrdb_obj.df.loc[indices]['GHI'] / self.df.loc[indices]['GHI']).fillna(1)) <= ratio_threshold
-        mask2 = np.abs(nsrdb_obj.df.loc[indices]['GHI'] - self.df.loc[indices]['GHI']) <= diff_threshold
+        # nsrdb_ghi = nsrdb_obj.df['GHI'].rolling(3, center=True).mean().fillna(0)
+        nsrdb_ghi = nsrdb_obj.df['GHI']
+        # hour_window = self.calc_window()
+        # ground_ghi = self.df['GHI'].rolling(hour_window, center=True).mean().fillna(0)
+        ground_ghi = self.df['GHI']
+        mask1 = np.abs( 1 - (nsrdb_ghi / ground_ghi)).fillna(1) <= ratio_threshold
+        mask2 = np.abs(nsrdb_ghi - ground_ghi) <= diff_threshold
         mask = mask1 | mask2
         self.add_mask(label, mask, overwrite=True)
+
+    def mask_night(self):
+        self.add_mask('day_time', self.df['GHI'] > 0)
 
     def cross_val_score(self, clf, cv=5, filter_fit=False, filter_score=False, scoring='accuracy', filter_kwargs=None,
                         fit_args=None, fit_kwargs=None, predict_args=None, predict_kwargs=None,
@@ -973,6 +1007,56 @@ class ClearskyDetection(object):
             yhat = pred[test_obj.df['mask']]
             scores.append(scorer(y, yhat, *scoring_args, **scoring_kwargs))
         return scores
+
+    def get_mask_tsplit(self, nsrdb_obj, tsplit=None, ignore_nsrdb_mismatch=False):
+        """Function to perform general data cleaning and masking to remove errors in ground and satellite data.
+
+        filter and preprocess data
+            fill values < 0 to 0
+            add in target column
+            remove missing days
+            remove periods with missing cloud data
+            remove periods where nsrdb and ground disagree 
+
+        Parameters
+        ----------
+        nsrdb_obj: ClearskyDetection object
+        tsplit: string, datetime object
+            Date and time where to split data (for training and testing).
+        ingore_nsrdb_mismatch: bool
+            Ignore filtering mismatched measurements between NSRDB and ground data.
+
+        Returns
+        -------
+        mask: np.array of bool
+            True values are data points that are 'clean enough' for training/scoring.
+        tsplit: np.array of bool
+            True values are before tsplit date, False values are after.
+        """
+
+        nsrdb_obj.intersection(self.df.index)
+        self.add_target_col(nsrdb_obj)
+        self.add_data_col(nsrdb_obj, 'GHI')
+        self.scale_model()
+
+        self.fill_low_to_zero()
+        self.mask_missing_days()
+        self.mask_night()
+        self.mask_missing_clouds(nsrdb_obj)
+        self.mask_nsrdb_incorrect_clouds(nsrdb_obj)
+        self.mask_nsrdb_incorrect_clear(nsrdb_obj)
+        if not ignore_nsrdb_mismatch:
+            self.mask_nsrdb_mismatch(nsrdb_obj)
+
+        # mask for splitting by time (useful for CV, train/test splitting)
+        if tsplit is not None:
+            self.df['before'] = self.df.index < tsplit
+        else:
+            self.df['before'] = True
+
+        # return feature matrix and target vector as dataframes
+        return self.df[self.masks_].all(axis=1), self.df['before']
+
 
 
 if __name__ == '__main__':

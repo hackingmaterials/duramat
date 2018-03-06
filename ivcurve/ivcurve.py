@@ -7,7 +7,6 @@ from sklearn import linear_model
 
 import utils
 
-
 def main():
     pass
 
@@ -19,7 +18,7 @@ class IVCurve(object):
     Current work is focused on building out the parameter extraction for modeling methods (LFM, SAPM).
     """
 
-    def __init__(self, voltage, current, name=None, low_voltage_cutoff=25, min_pts=25):
+    def __init__(self, voltage, current, temp=None, irrad=None, name=None, low_voltage_cutoff=25, min_pts=25):
         """Initialize object.
 
         Parameters
@@ -33,7 +32,8 @@ class IVCurve(object):
         min_pts: int
             Require a minimum number of points to exist for analysis.  This is after removing low voltage points.
         """
-
+        # voltage = np.asarray(voltage).flatten().astype(float)
+        # current = np.asarray(current).flatten().astype(float)
         mask = voltage > low_voltage_cutoff
         x = voltage[mask].astype(float)
         y = current[mask].astype(float)
@@ -55,6 +55,9 @@ class IVCurve(object):
             self.name_ = name
         else:
             self.name_ = 0
+
+        self.temp_ = temp
+        self.irrad_ = irrad
 
         self.interp_func_ = None
 
@@ -170,8 +173,8 @@ class IVCurve(object):
 
         # SAPM
         if mode.lower() in ('all', 'sapm'):
-            ix = self.smooth(np.asarray([.5 * voc]))
-            ixx = self.smooth(np.asarray([.5 * (voc + vpmax)]))
+            ix = self.smooth(np.asarray([.5 * voc]))[1]
+            ixx = self.smooth(np.asarray([.5 * (voc + vpmax)]))[1]
             params['ix'] = ix
             params['ixx'] = ixx
 
@@ -180,6 +183,46 @@ class IVCurve(object):
         #     params['voc_lm'] = voc_lm
 
         return params
+
+    def calc_lfm_params(self, rvoc, risc, rvpmax, ripmax, alpha, beta):
+        """Caluclate parameters for Loss Factor Model (LFM).  Measured parameters will be extracted from IV curve while
+        reference values must be supplied.
+
+        Parameters
+        ----------
+        rvoc: float
+            Reference open-circuit voltage (@STC).
+        risc: float
+            Reference short-circuit current (@STC).
+        rvpmax: float
+            Reference maximum power point voltage (@STC).
+        ripmax: float
+            Reference maximum power point current (@STC).
+        alpha: float 
+            Temperature coefficient for current.
+        beta: float
+            Temperature coefficient for voltage.
+
+        Returns
+        -------
+        lfm_params: dict
+            Parameters for modeling PV system using the LFM.
+        """
+        if self.irrad_ is None or self.temp_ is None:
+            raise ValueError('Must set member variables self.temp_ and self.irrad_ in order to calculate LFM parameters.')
+        components = self.extract_components(mode='all')
+        lfm_params = {}
+        lfm_params['nisct'] = components['isc'] / risc / self.irrad_ * (1 + alpha * (25 - self.temp_))
+        lfm_params['nrsc'] = components['ir'] / components['isc']
+        lfm_params['nimp'] = components['ipmax'] * risc / components['ir'] / ripmax
+        lfm_params['nroc'] = components['vr'] / components['voc']
+        lfm_params['nvmp'] = components['vpmax'] * rvoc / components['vr'] / rvpmax
+        lfm_params['nvoct'] = components['voc'] / rvoc * (1 + beta * (25 - self.temp_))
+        lfm_params['pimp'] = lfm_params['nisct'] * lfm_params['nrsc'] * lfm_params['nimp'] * ripmax * \
+                             (self.irrad_ / (1 + alpha * (25 - self.temp_)))
+        lfm_params['pvmp'] = lfm_params['nvmp'] * lfm_params['nroc'] * lfm_params['nvoct'] * rvpmax / \
+                             (1 + beta * (25 - self.temp_))
+        return lfm_params
 
     def normalize_curve(self, set_member=False, by='isc_voc', spline_kwargs={}):
         """Normalize IV curve by Isc/Voc or by MPP.  Data will be re-interpolated if set_member is True.
@@ -226,7 +269,7 @@ class IVCurve(object):
 
         return v, i
 
-    def interpolate(self, spline_kwargs={'s': 0.025}):
+    def interpolate(self, pct_change_allowed=0.1, spline_kwargs={'s': 0.025}):
         """Get interpolation function.
 
         Parameters
@@ -238,7 +281,11 @@ class IVCurve(object):
         -------
         self
         """
-        self.interp_func_ = interpolate.splrep(self.v_, self.i_, **spline_kwargs)
+        pct_change = np.abs(np.diff(self.i_)) / self.i_[:-1]
+        pct_change = np.insert(pct_change, 0, 0)
+        v = self.v_[pct_change < pct_change_allowed]
+        i = self.i_[pct_change < pct_change_allowed]
+        self.interp_func_ = interpolate.splrep(v, i, **spline_kwargs)
         return self
 
     def smooth(self, v=None, raw_v=False, der=0, npts=250):
@@ -449,7 +496,7 @@ class IVCurve(object):
         None
         """
         v, i = self.smooth()
-        components = self.extract_components(mode=None)
+        components = self.extract_components(mode='all')
 
         if ax is None:
             fig, ax = plt.subplots()
@@ -465,117 +512,6 @@ class IVCurve(object):
         ax.set_title('IV profile (sample {})'.format(self.name_))
         ax.set_xlabel('Voltage / V')
         ax.set_ylabel('Current / A')
-
-    def extract_lfm(self, irrad=None, t_cell=None, beta_vpmax=None, alpha_ipmax=None,
-                    risc=None, rvoc=None, ripmax=None, rvpmax=None):
-        """Get parameters from IV necessary for the loss factor model (LFM).
-
-        The points needed are:
-            Isc: short-circuit current
-            Voc: open-circuit voltage
-            Vr: voltage at intersection of Rsh and Rs tangent line
-            Ir: current at intersection of Rsh and Rs tangent line
-            Ipmax: current at maximum power
-            Vpmax: voltage at maximum power
-
-        Parameters
-        ----------
-        irrad: float
-            POA irradiance.
-        t_cell: float
-            Cell temperature (C).
-        beta_vpmax: float
-            Vpmax temperature coefficient.
-        alpha_ipmax: float
-            Ipmax temperature coefficient.
-        risc: float
-            Reference short-circuit current (@ STC).
-        rvoc: float
-            Reference open-circuit voltage (@ STC).
-        ripmax: float
-            Reference MPP current (@ STC).
-        rvpmax: float
-            Reference MPP voltage (@ STC).
-
-        Returns
-        -------
-        lfm_components: dict
-            Each key contains the LFM parameters needed.  They are isc, voc, ipmax, vpmax, ir, and vr (see above).
-        """
-        raise NotImplementedError("Use extract_components(..., mode='lfm', ...)")
-        components = self.extract_components(with_models=True)
-        ipmax = components['ipmax']
-        vpmax = components['vpmax']
-        isc = components['isc']
-        voc = components['voc']
-
-        isc_lm = components['isc_lm']
-        voc_lm = components['voc_lm']
-
-        isc_lm_m = isc_lm.coef_[0]
-        isc_lm_b = isc_lm.intercept_[0]
-
-        voc_lm_m = voc_lm.coef_[0]
-        voc_lm_b = voc_lm.intercept_[0]
-
-        vr = ((isc_lm_b * voc_lm_m) + voc_lm_b) / (1 - (isc_lm_m * voc_lm_m))
-        vr = vr[0]
-        ir = isc_lm.predict(np.asarray([vr]).reshape(-1, 1))[0][0]
-
-        lfm_components = {'isc': isc,
-                          'voc': voc,
-                          'ipmax': ipmax,
-                          'vpmax': vpmax,
-                          'ir': ir,
-                          'vr': vr}
-
-        return lfm_components
-
-    def extract_sapm(self):
-        """Get five points that summarize IV Curve according to Sandia PV Array Performance Model (SAPM).
-
-        Five points are:
-            Isc: short-circuit current
-            Ix: current at 1/2 Voc
-            Imp: current at maximum power
-            Ixx: current at 1/2 (Voc + Vmp)
-            Voc: current at open-circuit voltage
-
-        Details found at:
-        https://pvpmc.sandia.gov/modeling-steps/2-dc-module-iv/point-value-models/sandia-pv-array-performance-model/
-
-        Returns
-        -------
-        sapm_components: dict
-            Each key contains a pair of points as np.array [voltage, current].
-            The keys are isc, ix, imp, ixx, voc.  Definitions of each key are given above.
-        """
-        raise NotImplementedError("Use extract_components(..., mode='sapm', ...)")
-        components = self.extract_components()
-        imp = components['imp']
-        vmp = components['vmp']
-        isc = components['isc']
-        voc = components['voc']
-        ix = self.smooth(np.asarray([.5 * voc]))
-        ixx = self.smooth(np.asarray([.5 * (voc + vmp)]))
-
-        sapm_components = {'isc': isc,
-                           'ix': ix,
-                           'imp': imp,
-                           'ixx': ixx,
-                           'voc': voc}
-
-        return sapm_components
-
-    def translate_to_stc(self, irrad, temp, alpha, beta, kappa=1):
-        params = self.extract_components()
-
-        voc_new = params['voc'] - (params['rs'] * (0 - 0)) - (kappa * 0 * (25 - temp)) + (beta * (25 - temp))
-        v1, i1 = self.smooth(v=np.linspace(0, voc_new + 50, 250))
-        i2 = i1 + (params['isc'] * ((1000 / irrad) - 1)) + (alpha * (25 - temp))
-        v2 = v1 - (params['rs'] * (i2 - i1)) - (kappa * i2 * (25 - temp)) + (beta * (25 - temp))
-
-        return v2[v2 <= voc_new], i2[v2 <= voc_new]
 
 
 if __name__ == '__main__':
