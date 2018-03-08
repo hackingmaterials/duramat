@@ -8,7 +8,7 @@ from scipy import optimize
 from sklearn import ensemble, metrics, model_selection
 import matplotlib.pyplot as plt
 import itertools
-import xgboost as xgb
+# import xgboost as xgb
 
 
 def main():
@@ -427,34 +427,34 @@ class ProbabilityRandomForestClassifier(ensemble.RandomForestClassifier):
         # labels = np.all(labels[slices], axis=1)
         return labels
 
-class ProbabilityXGBClassifier(xgb.XGBClassifier):
-
-    def __init__(self, proba_cutoff=0.5, window=None,
-                 n_estimators=10, criterion='gini', max_depth=None, min_samples_split=2, min_samples_leaf=1,
-                 min_weight_fraction_leaf=0.0, max_features='auto', max_leaf_nodes=None, min_impurity_decrease=0.0,
-                 min_impurity_split=0, bootstrap=True, oob_score=False, n_jobs=1, random_state=None,
-                 verbose=0, warm_start=False, class_weight=None ):
-        super().__init__(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth,
-                         min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
-                         min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features,
-                         max_leaf_nodes=max_leaf_nodes, # min_impurity_decrease=min_impurity_decrease,
-                         min_impurity_split=min_impurity_split, bootstrap=bootstrap, oob_score=oob_score,
-                         n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start,
-                         class_weight=class_weight)
-        self.proba_cutoff = proba_cutoff
-        self.window = window
-
-    def predict(self, X):
-        labels = self.predict_proba(X)[:, 1] >= self.proba_cutoff
-        # labels = np.convolve(labels, np.ones(self.window) / self.window, mode='same')
-        # labels = labels > self.proba_cutoff
-        # slices = np.arange(len(labels))
-        # slices = [slices[i: i + self.window] for i in range(len(labels) - self.window + 1)]
-        # for i in range(self.window // 2):
-        #     slices.insert(0, slices[0])
-        #     slices.append(slices[-1])
-        # labels = np.all(labels[slices], axis=1)
-        return labels
+# class ProbabilityXGBClassifier(xgb.XGBClassifier):
+# 
+#     def __init__(self, proba_cutoff=0.5, window=None,
+#                  n_estimators=10, criterion='gini', max_depth=None, min_samples_split=2, min_samples_leaf=1,
+#                  min_weight_fraction_leaf=0.0, max_features='auto', max_leaf_nodes=None, min_impurity_decrease=0.0,
+#                  min_impurity_split=0, bootstrap=True, oob_score=False, n_jobs=1, random_state=None,
+#                  verbose=0, warm_start=False, class_weight=None ):
+#         super().__init__(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth,
+#                          min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
+#                          min_weight_fraction_leaf=min_weight_fraction_leaf, max_features=max_features,
+#                          max_leaf_nodes=max_leaf_nodes, # min_impurity_decrease=min_impurity_decrease,
+#                          min_impurity_split=min_impurity_split, bootstrap=bootstrap, oob_score=oob_score,
+#                          n_jobs=n_jobs, random_state=random_state, verbose=verbose, warm_start=warm_start,
+#                          class_weight=class_weight)
+#         self.proba_cutoff = proba_cutoff
+#         self.window = window
+# 
+#     def predict(self, X):
+#         labels = self.predict_proba(X)[:, 1] >= self.proba_cutoff
+#         # labels = np.convolve(labels, np.ones(self.window) / self.window, mode='same')
+#         # labels = labels > self.proba_cutoff
+#         # slices = np.arange(len(labels))
+#         # slices = [slices[i: i + self.window] for i in range(len(labels) - self.window + 1)]
+#         # for i in range(self.window // 2):
+#         #     slices.insert(0, slices[0])
+#         #     slices.append(slices[-1])
+#         # labels = np.all(labels[slices], axis=1)
+#         return labels
 
 
 def f1_tnr(ytrue, yhat):
