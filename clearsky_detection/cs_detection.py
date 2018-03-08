@@ -917,15 +917,16 @@ class ClearskyDetection(object):
         """Add filter to mask periods when NSRDB and ground measurements are 'too different'.
         """
         indices = self.df.index.intersection(nsrdb_obj.df.index)
-        # nsrdb_ghi = nsrdb_obj.df['GHI'].rolling(3, center=True).mean().fillna(0)
         nsrdb_ghi = nsrdb_obj.df['GHI']
-        # hour_window = self.calc_window()
-        # ground_ghi = self.df['GHI'].rolling(hour_window, center=True).mean().fillna(0)
         ground_ghi = self.df['GHI']
         mask1 = np.abs( 1 - (nsrdb_ghi / ground_ghi)).fillna(1) <= ratio_threshold
         mask2 = np.abs(nsrdb_ghi - ground_ghi) <= diff_threshold
         mask = mask1 | mask2
         self.add_mask(label, mask, overwrite=True)
+
+    def mask_maybe_clear(self, nsrdb_obj):
+       """Mask probably clear label from NSRDB"""
+       self.add_mask('probably_clear', nsrdb_obj.df['Cloud Type'] == 1) 
 
     def mask_night(self):
         self.add_mask('day_time', self.df['GHI'] > 0)
