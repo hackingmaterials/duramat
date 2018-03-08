@@ -881,7 +881,7 @@ class ClearskyDetection(object):
         mask = self.df['GHI'] >= 200
         self.add_mask('low_irrad', mask)
 
-    def mask_nsrdb_incorrect_clouds(self, nsrdb_obj, ratio_mean_val=.05, diff_mean_val=50, label='nsrdb_cloud_quality'):
+    def mask_nsrdb_incorrect_clouds(self, nsrdb_obj, diff_mean_val=50, label='nsrdb_cloud_quality'):
         """Generate mask to remove incorrectly labeled points from training set.
 
         Resulting mask should remove the cloudy points that 'look' clear.  It should include
@@ -892,13 +892,13 @@ class ClearskyDetection(object):
         if 'sky_status' not in nsrdb_obj.df.keys():
             nsrdb_obj.set_nsrdb_sky_status()
         nsrdb_obj.scale_model()
-        # utils.calc_all_window_metrics(nsrdb_obj.df, 3, self.meas_col, self.model_col, overwrite=True)
         nsrdb_obj.df[label] = True
-        if ratio_mean_val is not None and diff_mean_val is not None:
+        nsrdb_obj.df['GHI mean'] = nsrdb_obj.df['GHI'].rolling(3, center=True).mean()
+        nsrdb_obj.df['GHIcs mean'] = nsrdb_obj.df['Clearsky GHI pvlib'].rolling(3, center=True).mean()
+        if diff_mean_val is not None:
             nsrdb_obj.df.loc[(~nsrdb_obj.df['sky_status']) &
-                             # ((np.abs(1 - nsrdb_obj.df['GHI/GHIcs mean']) <= ratio_mean_val) |
-                             # (np.abs(nsrdb_obj.df['GHI-GHIcs mean']) <= diff_mean_val)) &
-                             (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) <= diff_mean_val) &
+                             (np.abs(nsrdb_obj.df['GHI mean'] - nsrdb_obj.df['GHIcs cs']) <= diff_mean_val) &
+                             # (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) <= diff_mean_val) &
                              (nsrdb_obj.df['GHI'] > 0), label] = False
         self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
 
@@ -906,11 +906,12 @@ class ClearskyDetection(object):
         """Mask periods where NSRDB labeled points as clear even though GHI and GHIcs are 'too different'.
         """
         nsrdb_obj.scale_model()
-        # utils.calc_all_window_metrics(nsrdb_obj.df, 3, self.meas_col, self.model_col, overwrite=True)
         nsrdb_obj.df[label] = True
+        nsrdb_obj.df['GHI mean'] = nsrdb_obj.df['GHI'].rolling(3, center=True).mean()
+        nsrdb_obj.df['GHIcs mean'] = nsrdb_obj.df['Clearsky GHI pvlib'].rolling(3, center=True).mean()
         nsrdb_obj.df.loc[(nsrdb_obj.df['sky_status']) &
-                         (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) > diff_mean_val), label] = False
-        #                (np.abs(nsrdb_obj.df['GHI-GHIcs mean']) > diff_mean_val), label] = False
+                         (np.abs(nsrdb_obj.df['GHI mean'] - nsrdb_obj.df['GHIcs mean']) > diff_mean_val), label] = False
+                         # (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) > diff_mean_val), label] = False
         self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
 
     def mask_nsrdb_mismatch(self, nsrdb_obj, ratio_threshold=.1, diff_threshold=100, label='nsrdb_mismatch'):
@@ -925,8 +926,8 @@ class ClearskyDetection(object):
         self.add_mask(label, mask, overwrite=True)
 
     def mask_maybe_clear(self, nsrdb_obj):
-       """Mask probably clear label from NSRDB"""
-       self.add_mask('probably_clear', nsrdb_obj.df['Cloud Type'] == 1) 
+        """Mask probably clear label from NSRDB"""
+        self.add_mask('probably_clear', nsrdb_obj.df['Cloud Type'].astype(int) == 1) 
 
     def mask_night(self):
         self.add_mask('day_time', self.df['GHI'] > 0)
@@ -1046,6 +1047,7 @@ class ClearskyDetection(object):
         self.mask_missing_clouds(nsrdb_obj)
         self.mask_nsrdb_incorrect_clouds(nsrdb_obj)
         self.mask_nsrdb_incorrect_clear(nsrdb_obj)
+        self.mask_maybe_clear(nsrdb_obj)
         if not ignore_nsrdb_mismatch:
             self.mask_nsrdb_mismatch(nsrdb_obj)
 
