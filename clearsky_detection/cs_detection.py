@@ -897,7 +897,7 @@ class ClearskyDetection(object):
         nsrdb_obj.df['GHIcs mean'] = nsrdb_obj.df['Clearsky GHI pvlib'].rolling(3, center=True).mean()
         if diff_mean_val is not None:
             nsrdb_obj.df.loc[(~nsrdb_obj.df['sky_status']) &
-                             (np.abs(nsrdb_obj.df['GHI mean'] - nsrdb_obj.df['GHIcs cs']) <= diff_mean_val) &
+                             (np.abs(nsrdb_obj.df['GHI mean'] - nsrdb_obj.df['GHIcs mean']) <= diff_mean_val) &
                              # (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) <= diff_mean_val) &
                              (nsrdb_obj.df['GHI'] > 0), label] = False
         self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
