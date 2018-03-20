@@ -540,19 +540,32 @@ class ClearskyDetection(object):
 
         """
         # for day, group in self.df.groupby([self.df.index.year, self.df.index.week]):
-        for day, group in self.df.groupby([self.df.index.year, self.df.index.week]):
-            mask = group[self.target_col].astype(bool).values & np.all(group[self.masks_].values, axis=1)
-            if np.sum(mask) == 0:
-                continue
-            clear_meas = group[mask][self.meas_col]
-            clear_model = group[mask][self.model_col]
+        # for day, group in self.df.groupby([self.df.index.year, self.df.index.week]):
+        #     mask = group[self.target_col].astype(bool).values & np.all(group[self.masks_].values, axis=1)
+        #     if np.sum(mask) == 0:
+        #         continue
+        #     clear_meas = group[mask][self.meas_col]
+        #     clear_model = group[mask][self.model_col]
 
-            def rmse(alpha):
-                sqr_err = (clear_meas - (alpha * clear_model))**2
-                return np.sqrt(np.mean(sqr_err))
+        #     def rmse(alpha):
+        #         sqr_err = (clear_meas - (alpha * clear_model))**2
+        #         return np.sqrt(np.mean(sqr_err))
 
-            alp = optimize.minimize_scalar(rmse).x
-            self.df.loc[self.df.index.isin(group.index), self.model_col] = alp * group[self.model_col]
+        #     alp = optimize.minimize_scalar(rmse).x
+        #     self.df.loc[self.df.index.isin(group.index), self.model_col] = alp * group[self.model_col]
+
+        mask = self.df[self.target_col].astype(bool).values & np.all(self.df[self.masks_].values, axis=1)
+        # if np.sum(mask) == 0:
+        #     continue
+        clear_meas = self.df[mask][self.meas_col]
+        clear_model = self.df[mask][self.model_col]
+
+        def rmse(alpha):
+            sqr_err = (clear_meas - (alpha * clear_model))**2
+            return np.sqrt(np.mean(sqr_err))
+
+        alp = optimize.minimize_scalar(rmse).x
+        self.df.loc[:, self.model_col] = alp * self.df[self.model_col]
 
     def fit_model(self, clf, scale=True, clean=False, sample_weight=None, *args, **kwargs):
         """Fit an sklearn estimator object.
@@ -845,7 +858,7 @@ class ClearskyDetection(object):
 
     def add_data_col(self, nsrdb_obj, col):
         self.df[col + ' nsrdb'] = nsrdb_obj.df[col]
-        self.df[col + ' nsrdb'] = self.df[col + ' nsrdb'].interpolate()
+        # self.df[col + ' nsrdb'] = self.df[col + ' nsrdb'].interpolate()
 
     def fill_low_to_zero(self, low_cutoff=0):
         """Make GHI values below zero equal to zero.
@@ -914,20 +927,31 @@ class ClearskyDetection(object):
                          # (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) > diff_mean_val), label] = False
         self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
 
-    def mask_nsrdb_mismatch(self, nsrdb_obj, ratio_threshold=.1, diff_threshold=100, label='nsrdb_mismatch'):
+    def mask_nsrdb_mismatch(self, nsrdb_obj, ratio_threshold=.1, diff_threshold=50, label='nsrdb_mismatch'):
         """Add filter to mask periods when NSRDB and ground measurements are 'too different'.
         """
+        window_size_dict = {30: 3, 15: 5, 10: 7, 5: 13, 1: 61}
         indices = self.df.index.intersection(nsrdb_obj.df.index)
         nsrdb_ghi = nsrdb_obj.df['GHI']
         ground_ghi = self.df['GHI']
-        mask1 = np.abs( 1 - (nsrdb_ghi / ground_ghi)).fillna(1) <= ratio_threshold
-        mask2 = np.abs(nsrdb_ghi - ground_ghi) <= diff_threshold
-        mask = mask1 | mask2
+
+        freq = int(np.unique(np.diff(self.df.index))[0] / 1.0e9 / 60.0e0)
+
+        nsrdb_ghi_max= nsrdb_ghi.rolling(3, center=True).max().fillna(0)
+        ground_ghi_max = ground_ghi.rolling(window_size_dict[freq], center=True).max().fillna(0)
+        nsrdb_ghi_min = nsrdb_ghi.rolling(3, center=True).min().fillna(0)
+        ground_ghi_min = ground_ghi.rolling(window_size_dict[freq], center=True).min().fillna(0)
+
+        # mask1 = np.abs( 1 - (nsrdb_ghi / ground_ghi)).fillna(1) <= ratio_threshold
+        mask1 = np.abs(nsrdb_ghi_min - ground_ghi_min) <= diff_threshold
+        mask2 = np.abs(nsrdb_ghi_max - ground_ghi_max) <= diff_threshold
+        mask = mask1 & mask2
+        # mask = mask1 | mask2
         self.add_mask(label, mask, overwrite=True)
 
     def mask_maybe_clear(self, nsrdb_obj):
         """Mask probably clear label from NSRDB"""
-        self.add_mask('probably_clear', nsrdb_obj.df['Cloud Type'].astype(int) == 1) 
+        self.add_mask('probably_clear', ~(nsrdb_obj.df['Cloud Type'].astype(int) == 1))
 
     def mask_night(self):
         self.add_mask('day_time', self.df['GHI'] > 0)
