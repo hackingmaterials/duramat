@@ -810,9 +810,6 @@ class ClearskyDetection(object):
         nsrdb_obj.intersection(self.df.index)
         self.add_target_col(nsrdb_obj)
         self.add_data_col(nsrdb_obj, 'GHI')
-        # scale model
-        #   scales the modeled clear sky to measured clear sky at points labeled clear in 'sky_status' column
-        #   this is done on the filtered data frame (all masks applied before scaling)
         self.scale_model()
 
         self.fill_low_to_zero()
@@ -821,17 +818,18 @@ class ClearskyDetection(object):
         self.mask_missing_clouds(nsrdb_obj)
         self.mask_nsrdb_incorrect_clouds(nsrdb_obj)
         self.mask_nsrdb_incorrect_clear(nsrdb_obj)
+        self.mask_maybe_clear(nsrdb_obj)
         if not ignore_nsrdb_mismatch:
             self.mask_nsrdb_mismatch(nsrdb_obj)
-
-        # calculate window based ML metrics
-        self.calc_all_metrics()
 
         # mask for splitting by time (useful for CV, train/test splitting)
         if tsplit is not None:
             self.df['before'] = self.df.index < tsplit
         else:
             self.df['before'] = True
+
+        # calculate window based ML metrics
+        self.calc_all_metrics()
 
         # return feature matrix and target vector as dataframes
         return self.df[self.features_], self.df[self.target_col], self.df[self.masks_].all(axis=1), self.df['before']
@@ -937,15 +935,21 @@ class ClearskyDetection(object):
 
         freq = int(np.unique(np.diff(self.df.index))[0] / 1.0e9 / 60.0e0)
 
-        nsrdb_ghi_max= nsrdb_ghi.rolling(3, center=True).max().fillna(0)
+        # nsrdb_ghi_mean= nsrdb_ghi.rolling(3, center=True).mean().fillna(0)
+        # ground_ghi_mean= ground_ghi.rolling(window_size_dict[freq], center=True).mean().fillna(0)
+        nsrdb_ghi_max = nsrdb_ghi.rolling(3, center=True).max().fillna(0)
         ground_ghi_max = ground_ghi.rolling(window_size_dict[freq], center=True).max().fillna(0)
         nsrdb_ghi_min = nsrdb_ghi.rolling(3, center=True).min().fillna(0)
         ground_ghi_min = ground_ghi.rolling(window_size_dict[freq], center=True).min().fillna(0)
+        nsrdb_ghi_median = nsrdb_ghi.rolling(3, center=True).median().fillna(0)
+        ground_ghi_median = ground_ghi.rolling(window_size_dict[freq], center=True).median().fillna(0)
 
         # mask1 = np.abs( 1 - (nsrdb_ghi / ground_ghi)).fillna(1) <= ratio_threshold
+        # mask1 = np.abs(nsrdb_ghi_mean - ground_ghi_mean) <= diff_threshold
         mask1 = np.abs(nsrdb_ghi_min - ground_ghi_min) <= diff_threshold
         mask2 = np.abs(nsrdb_ghi_max - ground_ghi_max) <= diff_threshold
-        mask = mask1 & mask2
+        mask3 = np.abs(nsrdb_ghi_median - ground_ghi_median) <= diff_threshold
+        mask = mask1 & mask2 & mask3
         # mask = mask1 | mask2
         self.add_mask(label, mask, overwrite=True)
 

@@ -38,11 +38,65 @@ def read_iv_csv(fname, round_30min=False):
 #         except ValueError:  # 'points' is NaN, breaks array slicing, skip entry
 #             continue
     df = pd.DataFrame(ser_list)
-    df['datetime'] = pd.to_datetime(df['datetime'])
-    df['date'] = df['datetime'].apply(lambda x: x.date())
-    df['time'] = df['datetime'].apply(lambda x: x.time())
-    if round_30min:
-        df['datetime_rounded'] = df['datetime'].dt.round('30min')
+    try:
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        df['date'] = df['datetime'].apply(lambda x: x.date())
+        df['time'] = df['datetime'].apply(lambda x: x.time())
+        if round_30min:
+            df['datetime_rounded'] = df['datetime'].dt.round('30min')
+    except ValueError:
+        pass
+    return df
+
+def read_iv_csv_updated(fname, round_30min=False):
+    """Read IV-curve file from Sandia.
+
+    Data will also be cleaned to remove 'Unnamed' columns.  The current and voltage values will be
+    compressed into their own cell ('current_series' and 'voltage_series').   These values are
+    listed in the 'Unnamed' columns that are being removed.
+
+    Parameters
+    ----------
+    fname: str
+        Path to file.
+
+    Returns
+    -------
+    df: pd.DataFrame
+        DataFrame of IV data with 'Unnamed' columns removed.
+    """
+    df = pd.read_csv(fname)
+    ser_list = []
+    df['datetime'] = df['timestamp']
+    for index, ser in df.iterrows():
+        if np.isfinite(ser['points']):
+            # print(ser['I'])
+            # print(type(ser['I']))
+            try:
+                curr = [float(i) for i in ser['I'].strip().split(',')]
+                volt = [float(i) for i in ser['V'].strip().split(',')]
+            except AttributeError:
+                curr = np.zeros((1,))
+                volt = np.zeros((1,))
+            # print(curr)
+            # print(type(curr))
+            ser['current_array'] = np.asarray(curr)
+            ser['voltage_array'] = np.asarray(volt)
+            # ser['current_array'] = ser.values[12: 12 + int(ser['points'])]
+            # ser['voltage_array'] = ser.values[12 + int(ser['points']): 12 + (2 * int(ser['points']))]
+            ser_list.append(ser[['datetime', 'irrad', 'temp', 'string', 'isc', 'voc', 'pmax',
+                                 'ipmax', 'vpmax', 'ff', 'points', 'current_array', 'voltage_array']])
+#         except ValueError:  # 'points' is NaN, breaks array slicing, skip entry
+#             continue
+    df = pd.DataFrame(ser_list)
+    try:
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        df['date'] = df['datetime'].apply(lambda x: x.date())
+        df['time'] = df['datetime'].apply(lambda x: x.time())
+        if round_30min:
+            df['datetime_rounded'] = df['datetime'].dt.round('30min')
+    except ValueError:
+        pass
     return df
 
 

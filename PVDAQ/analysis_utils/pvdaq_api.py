@@ -6,11 +6,13 @@ PV data for a specific site given a specific set of dates.
 """
 
 import datetime
-# import collections
 
 import requests
 import numpy as np
 import pandas as pd
+
+def main():
+    pass
 
 
 class PVDAQ_API(object):
@@ -527,3 +529,7 @@ class PVDAQ_API(object):
             return response.json()
         except requests.exceptions.HTTPError as error:
             print(error)
+
+
+if __name__ == '__main__':
+    main()
