@@ -925,32 +925,20 @@ class ClearskyDetection(object):
                          # (np.abs(nsrdb_obj.df['GHI'] - nsrdb_obj.df['Clearsky GHI pvlib']) > diff_mean_val), label] = False
         self.add_mask(label, nsrdb_obj.df[label], overwrite=True)
 
-    def mask_nsrdb_mismatch(self, nsrdb_obj, ratio_threshold=.1, diff_threshold=50, label='nsrdb_mismatch'):
+    def mask_nsrdb_mismatch(self, nsrdb_obj, diff_threshold=50, label='nsrdb_mismatch'):
         """Add filter to mask periods when NSRDB and ground measurements are 'too different'.
         """
         window_size_dict = {30: 3, 15: 5, 10: 7, 5: 13, 1: 61}
-        indices = self.df.index.intersection(nsrdb_obj.df.index)
+        # indices = self.df.index.intersection(nsrdb_obj.df.index)
         nsrdb_ghi = nsrdb_obj.df['GHI']
         ground_ghi = self.df['GHI']
 
         freq = int(np.unique(np.diff(self.df.index))[0] / 1.0e9 / 60.0e0)
 
-        # nsrdb_ghi_mean= nsrdb_ghi.rolling(3, center=True).mean().fillna(0)
-        # ground_ghi_mean= ground_ghi.rolling(window_size_dict[freq], center=True).mean().fillna(0)
-        nsrdb_ghi_max = nsrdb_ghi.rolling(3, center=True).max().fillna(0)
-        ground_ghi_max = ground_ghi.rolling(window_size_dict[freq], center=True).max().fillna(0)
-        nsrdb_ghi_min = nsrdb_ghi.rolling(3, center=True).min().fillna(0)
-        ground_ghi_min = ground_ghi.rolling(window_size_dict[freq], center=True).min().fillna(0)
-        nsrdb_ghi_median = nsrdb_ghi.rolling(3, center=True).median().fillna(0)
-        ground_ghi_median = ground_ghi.rolling(window_size_dict[freq], center=True).median().fillna(0)
+        nsrdb_ghi_mean= nsrdb_ghi.rolling(3, center=True).mean().fillna(0)
+        ground_ghi_mean= ground_ghi.rolling(window_size_dict[freq], center=True).mean().fillna(0)
 
-        # mask1 = np.abs( 1 - (nsrdb_ghi / ground_ghi)).fillna(1) <= ratio_threshold
-        # mask1 = np.abs(nsrdb_ghi_mean - ground_ghi_mean) <= diff_threshold
-        mask1 = np.abs(nsrdb_ghi_min - ground_ghi_min) <= diff_threshold
-        mask2 = np.abs(nsrdb_ghi_max - ground_ghi_max) <= diff_threshold
-        mask3 = np.abs(nsrdb_ghi_median - ground_ghi_median) <= diff_threshold
-        mask = mask1 & mask2 & mask3
-        # mask = mask1 | mask2
+        mask = np.abs(nsrdb_ghi_mean - ground_ghi_mean) <= diff_threshold
         self.add_mask(label, mask, overwrite=True)
 
     def mask_maybe_clear(self, nsrdb_obj):
