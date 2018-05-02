@@ -518,10 +518,12 @@ def plot_confusion_matrix(cm, classes=['cloudy', 'clear'],
 
 def plot_ml_vs_nsrdb(ground_obj, yhat, mask, tsplit, t0, t1,
                      yhat_label='ml_status', plot_label='ML clear',
-                     fig_kwargs={}, fname='tmp.png'):
+                     fig_kwargs={}, fname='tmp.png', yhat_dflt=None):
     df = ground_obj.df[~tsplit]
     df[yhat_label] = yhat
-
+    if yhat_dflt is None:
+        yhat_dflt = np.zeros(len(yhat))
+    df['pvlib default'] = yhat_dflt
     df = df[(df.index >= t0) & (df.index < t1)]
     nplots = len(pd.unique(df.index.date))
     ncol = min(3, nplots)
@@ -547,13 +549,21 @@ def plot_ml_vs_nsrdb(ground_obj, yhat, mask, tsplit, t0, t1,
         b = ax.plot(group.index.time, group['Clearsky GHI pvlib'], label='GHIcs', c='k', alpha=.5)
         c = ax.plot(group.index.time, group['GHI nsrdb'], label='GHInsrdb', c='k', alpha=.5, linestyle='--')
 
-        d = ax.scatter(group[group[yhat_label]].index.time, group[group[yhat_label]]['GHI'], label=plot_label)
+        d = ax.scatter(group[group[yhat_label] & ~group['pvlib default']].index.time,
+                       group[group[yhat_label] & ~group['pvlib default']]['GHI'], label=plot_label)
 
-        e = ax.scatter(group[group['sky_status'] & mask].index.time, group[group['sky_status'] & mask]['GHI'], label='NSRDB clear',
-                   marker='o', s=250, facecolor='none', edgecolor='C1', linewidth=2)
+        f = ax.scatter(group[group['pvlib default'] & ~group[yhat_label]].index.time,
+                       group[group['pvlib default'] & ~group[yhat_label]]['GHI'], label='Default only')
+
+        g = ax.scatter(group[group['pvlib default'] & group[yhat_label]].index.time,
+                       group[group['pvlib default'] & group[yhat_label]]['GHI'], label='Default and optimized')
+
+        e = ax.scatter(group[group['sky_status'] & mask].index.time,
+                       group[group['sky_status'] & mask]['GHI'], label='NSRDB clear',
+                       marker='o', s=250, facecolor='none', edgecolor='C3', linewidth=2)
 
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='best', prop={'size': 14}, shadow=False, framealpha=1)
+    fig.legend(handles, labels, loc='best', prop={'size': 14}, shadow=False, framealpha=1, bbox_to_anchor=(1.3, .9))
     # fig.text(.04, .5, 'GHI / Wm$^{-2}$', va='center', rotation='vertical')
     fig.tight_layout()
     fig.autofmt_xdate()

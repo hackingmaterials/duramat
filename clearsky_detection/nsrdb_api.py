@@ -39,7 +39,7 @@ class NSRDBAPI(object):
     More information on the API can be found at https://developer.nrel.gov/docs/solar/nsrdb/
     """
 
-    def __init__(self, api_key, wkt, email=None, mailing_list=False, affiliation=None, full_name='user1',
+    def __init__(self, api_key, wkt, wkt_type='POINT', email=None, mailing_list=False, affiliation=None, full_name='user1',
                  reason=None, leap_day=False, utc=False, interval=30,
                  names=(1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012,
                         2013, 2014, 2015, 'tmy'),
@@ -57,6 +57,8 @@ class NSRDBAPI(object):
             Well-known text of longitude/latitude points.  Should be a list/tuple of points.
             Longitude and latitude for a single point must be strings separated by spaces.  Order matters - it must be
             'longitude latitude'.
+        wkt_type: str
+            Type of wkt shape (POINT, MULTIPOINT, or POLYGON supported).
         email: str
             Address where data will be delivered.  This is required data_call method.  The site_count method will
             work without an email.
@@ -81,6 +83,9 @@ class NSRDBAPI(object):
         """
         self.api_key = api_key
         self.wkt = wkt
+        if wkt_type not in ('POINT', 'MULTIPOINT', 'POLYGON'):
+            raise NotImplementedError('Only POINT, MULTIPOINT, and POLYGON wkt supported.')
+        self.wkt_type = wkt_type
         self.email = email
         self.mailing_list = str(mailing_list).lower()
         self.affiliation = affiliation
@@ -169,10 +174,14 @@ class NSRDBAPI(object):
             Formatted wkt for call.
         """
         wkt = ','.join(self.wkt)
-        if len(self.wkt) > 1:
+        if len(self.wkt) > 1 and self.wkt_type.lower() == 'multipoint':
             wkt = 'MULTIPOINT(' + wkt + ')'
-        else:
+        elif len(self.wkt) > 1 and self.wkt_type.lower() == 'polygon':
+            wkt = 'POLYGON((' + wkt + '))'
+        elif len(self.wkt) == 1:
             wkt = 'POINT(' + wkt + ')'
+        else:
+            raise ValueError('Unrecognized wkt_type.  Must be POINT, MULTIPOINT, or POLYGON.')
         return wkt
 
     def _make_payload(self):
@@ -213,9 +222,9 @@ class NSRDBAPI(object):
         """
         if self.email is None:
             raise ValueError('You must supply an email')
-        call_weight = self.calc_call_weight(estimate_site_count=estimate_site_count)
-        if call_weight > MAX_WEIGHT:
-            raise RuntimeError('API call is over maximum weight ({} > {}).'.format(call_weight, MAX_WEIGHT))
+        # call_weight = self.calc_call_weight(estimate_site_count=estimate_site_count)
+        # if call_weight > MAX_WEIGHT:
+        #     raise RuntimeError('API call is over maximum weight ({} > {}).'.format(call_weight, MAX_WEIGHT))
         # else:
         #     print('Call weight acceptable ({} < {})'.format(call_weight, MAX_WEIGHT))
         url = self._make_url('data')
